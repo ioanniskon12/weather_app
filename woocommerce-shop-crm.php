@@ -99,6 +99,8 @@ class WooCommerce_Shop_CRM {
         add_action('wp_ajax_wsc_update_order_status', array($this, 'ajax_update_order_status'));
         add_action('wp_ajax_wsc_save_offer', array($this, 'ajax_save_offer'));
         add_action('wp_ajax_wsc_delete_offer', array($this, 'ajax_delete_offer'));
+        add_action('wp_ajax_wsc_optimize_images', array($this, 'ajax_optimize_images'));
+        add_action('wp_ajax_wsc_save_image_settings', array($this, 'ajax_save_image_settings'));
     }
 
     /**
@@ -202,6 +204,16 @@ class WooCommerce_Shop_CRM {
             'woo-shop-crm-offers',
             array($this, 'render_offers')
         );
+
+        // Settings submenu
+        add_submenu_page(
+            'woo-shop-crm',
+            __('Image Settings', 'woo-shop-crm'),
+            __('Image Settings', 'woo-shop-crm'),
+            'manage_woocommerce',
+            'woo-shop-crm-settings',
+            array($this, 'render_settings')
+        );
     }
 
     /**
@@ -265,6 +277,13 @@ class WooCommerce_Shop_CRM {
      */
     public function render_offers() {
         include WOO_SHOP_CRM_PLUGIN_DIR . 'templates/offers.php';
+    }
+
+    /**
+     * Render settings page
+     */
+    public function render_settings() {
+        include WOO_SHOP_CRM_PLUGIN_DIR . 'templates/settings.php';
     }
 
     /**
@@ -364,6 +383,62 @@ class WooCommerce_Shop_CRM {
             wp_send_json_success(array('message' => 'Offer deleted successfully'));
         } else {
             wp_send_json_error(array('message' => 'Failed to delete offer'));
+        }
+    }
+
+    /**
+     * AJAX: Optimize images (bulk)
+     */
+    public function ajax_optimize_images() {
+        check_ajax_referer('wsc_crm_nonce', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(array('message' => 'Unauthorized'));
+        }
+
+        $product_manager = new WSC_Product_Manager();
+        $optimized_count = $product_manager->optimize_existing_product_images();
+
+        wp_send_json_success(array(
+            'message' => sprintf(__('%d images optimized successfully', 'woo-shop-crm'), $optimized_count),
+            'count' => $optimized_count
+        ));
+    }
+
+    /**
+     * AJAX: Save image settings
+     */
+    public function ajax_save_image_settings() {
+        check_ajax_referer('wsc_crm_nonce', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(array('message' => 'Unauthorized'));
+        }
+
+        $width = isset($_POST['image_width']) ? intval($_POST['image_width']) : 800;
+        $height = isset($_POST['image_height']) ? intval($_POST['image_height']) : 800;
+        $quality = isset($_POST['image_quality']) ? intval($_POST['image_quality']) : 85;
+
+        // Validate ranges
+        if ($width < 100 || $width > 5000) {
+            wp_send_json_error(array('message' => 'Width must be between 100 and 5000 pixels'));
+        }
+
+        if ($height < 100 || $height > 5000) {
+            wp_send_json_error(array('message' => 'Height must be between 100 and 5000 pixels'));
+        }
+
+        if ($quality < 1 || $quality > 100) {
+            wp_send_json_error(array('message' => 'Quality must be between 1 and 100'));
+        }
+
+        $product_manager = new WSC_Product_Manager();
+        $result = $product_manager->update_image_settings($width, $height, $quality);
+
+        if ($result) {
+            wp_send_json_success(array('message' => 'Settings saved successfully'));
+        } else {
+            wp_send_json_error(array('message' => 'Failed to save settings'));
         }
     }
 }
