@@ -101,6 +101,8 @@ class WooCommerce_Shop_CRM {
         add_action('wp_ajax_wsc_delete_offer', array($this, 'ajax_delete_offer'));
         add_action('wp_ajax_wsc_optimize_images', array($this, 'ajax_optimize_images'));
         add_action('wp_ajax_wsc_save_image_settings', array($this, 'ajax_save_image_settings'));
+        add_action('wp_ajax_wsc_save_badge_settings', array($this, 'ajax_save_badge_settings'));
+        add_action('wp_ajax_wsc_upload_logo', array($this, 'ajax_upload_logo'));
     }
 
     /**
@@ -440,6 +442,82 @@ class WooCommerce_Shop_CRM {
         } else {
             wp_send_json_error(array('message' => 'Failed to save settings'));
         }
+    }
+
+    /**
+     * AJAX: Save badge settings
+     */
+    public function ajax_save_badge_settings() {
+        check_ajax_referer('wsc_crm_nonce', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(array('message' => 'Unauthorized'));
+        }
+
+        $settings = array(
+            'badge_enabled' => isset($_POST['badge_enabled']) ? true : false,
+            'badge_text' => isset($_POST['badge_text']) ? sanitize_text_field($_POST['badge_text']) : 'SALE',
+            'badge_position' => isset($_POST['badge_position']) ? sanitize_text_field($_POST['badge_position']) : 'top-right',
+            'badge_bg_color' => isset($_POST['badge_bg_color']) ? sanitize_hex_color($_POST['badge_bg_color']) : '#FF0000',
+            'badge_text_color' => isset($_POST['badge_text_color']) ? sanitize_hex_color($_POST['badge_text_color']) : '#FFFFFF',
+            'badge_size' => isset($_POST['badge_size']) ? intval($_POST['badge_size']) : 60,
+            'logo_enabled' => isset($_POST['logo_enabled']) ? true : false,
+            'logo_attachment_id' => isset($_POST['logo_attachment_id']) ? intval($_POST['logo_attachment_id']) : 0,
+            'logo_position' => isset($_POST['logo_position']) ? sanitize_text_field($_POST['logo_position']) : 'bottom-right',
+            'logo_size' => isset($_POST['logo_size']) ? intval($_POST['logo_size']) : 80,
+        );
+
+        $product_manager = new WSC_Product_Manager();
+        $result = $product_manager->update_badge_settings($settings);
+
+        if ($result) {
+            wp_send_json_success(array('message' => 'Badge settings saved successfully'));
+        } else {
+            wp_send_json_error(array('message' => 'Failed to save badge settings'));
+        }
+    }
+
+    /**
+     * AJAX: Upload logo
+     */
+    public function ajax_upload_logo() {
+        check_ajax_referer('wsc_crm_nonce', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(array('message' => 'Unauthorized'));
+        }
+
+        if (empty($_FILES['logo_file'])) {
+            wp_send_json_error(array('message' => 'No file uploaded'));
+        }
+
+        require_once(ABSPATH . 'wp-admin/includes/image.php');
+        require_once(ABSPATH . 'wp-admin/includes/file.php');
+        require_once(ABSPATH . 'wp-admin/includes/media.php');
+
+        $file = $_FILES['logo_file'];
+
+        // Validate file type
+        $allowed_types = array('image/jpeg', 'image/jpg', 'image/png', 'image/gif');
+        if (!in_array($file['type'], $allowed_types)) {
+            wp_send_json_error(array('message' => 'Invalid file type. Only JPG, PNG, and GIF are allowed.'));
+        }
+
+        // Upload file
+        $attachment_id = media_handle_upload('logo_file', 0);
+
+        if (is_wp_error($attachment_id)) {
+            wp_send_json_error(array('message' => $attachment_id->get_error_message()));
+        }
+
+        // Get image URL
+        $image_url = wp_get_attachment_url($attachment_id);
+
+        wp_send_json_success(array(
+            'message' => 'Logo uploaded successfully',
+            'attachment_id' => $attachment_id,
+            'image_url' => $image_url
+        ));
     }
 }
 

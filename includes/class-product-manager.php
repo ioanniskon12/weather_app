@@ -275,6 +275,9 @@ class WSC_Product_Manager {
             return $file;
         }
 
+        // Add badge/logo overlay if enabled
+        $this->add_badge_overlay($file['tmp_name']);
+
         // Update file size
         $file['size'] = filesize($file['tmp_name']);
 
@@ -332,6 +335,9 @@ class WSC_Product_Manager {
                 $metadata['file'] = $saved['file'];
             }
         }
+
+        // Add badge/logo overlay if enabled
+        $this->add_badge_overlay($file_path);
 
         return $metadata;
     }
@@ -475,6 +481,329 @@ class WSC_Product_Manager {
         update_option('wsc_image_width', intval($width));
         update_option('wsc_image_height', intval($height));
         update_option('wsc_image_quality', intval($quality));
+
+        return true;
+    }
+
+    /**
+     * Add badge/logo overlay to image
+     */
+    public function add_badge_overlay($file_path) {
+        if (!file_exists($file_path)) {
+            return false;
+        }
+
+        $badge_enabled = get_option('wsc_badge_enabled', false);
+        $logo_enabled = get_option('wsc_logo_enabled', false);
+
+        if (!$badge_enabled && !$logo_enabled) {
+            return false;
+        }
+
+        // Get GD image resource
+        $image_info = getimagesize($file_path);
+        if (!$image_info) {
+            return false;
+        }
+
+        $mime_type = $image_info['mime'];
+
+        // Create image resource based on type
+        switch ($mime_type) {
+            case 'image/jpeg':
+            case 'image/jpg':
+                $image = imagecreatefromjpeg($file_path);
+                break;
+            case 'image/png':
+                $image = imagecreatefrompng($file_path);
+                break;
+            case 'image/gif':
+                $image = imagecreatefromgif($file_path);
+                break;
+            default:
+                return false;
+        }
+
+        if (!$image) {
+            return false;
+        }
+
+        // Enable alpha blending for transparency
+        imagealphablending($image, true);
+        imagesavealpha($image, true);
+
+        // Add text badge if enabled
+        if ($badge_enabled) {
+            $this->apply_text_badge($image);
+        }
+
+        // Add logo overlay if enabled
+        if ($logo_enabled) {
+            $this->apply_logo_overlay($image);
+        }
+
+        // Save the modified image
+        switch ($mime_type) {
+            case 'image/jpeg':
+            case 'image/jpg':
+                imagejpeg($image, $file_path, self::IMAGE_QUALITY);
+                break;
+            case 'image/png':
+                imagepng($image, $file_path, 9);
+                break;
+            case 'image/gif':
+                imagegif($image, $file_path);
+                break;
+        }
+
+        imagedestroy($image);
+
+        return true;
+    }
+
+    /**
+     * Apply text badge to image
+     */
+    private function apply_text_badge($image) {
+        $badge_text = get_option('wsc_badge_text', 'SALE');
+        $badge_position = get_option('wsc_badge_position', 'top-right');
+        $badge_bg_color = get_option('wsc_badge_bg_color', '#FF0000');
+        $badge_text_color = get_option('wsc_badge_text_color', '#FFFFFF');
+        $badge_size = intval(get_option('wsc_badge_size', 60));
+
+        $img_width = imagesx($image);
+        $img_height = imagesy($image);
+
+        // Badge dimensions
+        $badge_width = $badge_size * 2;
+        $badge_height = $badge_size;
+        $font_size = $badge_size / 3;
+
+        // Parse colors
+        list($bg_r, $bg_g, $bg_b) = sscanf($badge_bg_color, "#%02x%02x%02x");
+        list($text_r, $text_g, $text_b) = sscanf($badge_text_color, "#%02x%02x%02x");
+
+        // Create colors
+        $bg_color = imagecolorallocatealpha($image, $bg_r, $bg_g, $bg_b, 20); // Semi-transparent
+        $text_color = imagecolorallocate($image, $text_r, $text_g, $text_b);
+        $border_color = imagecolorallocate($image, 0, 0, 0);
+
+        // Calculate position
+        $positions = $this->calculate_badge_position($img_width, $img_height, $badge_width, $badge_height, $badge_position);
+        $x = $positions['x'];
+        $y = $positions['y'];
+
+        // Draw rounded rectangle for badge background
+        $this->draw_rounded_rectangle($image, $x, $y, $badge_width, $badge_height, 10, $bg_color, $border_color);
+
+        // Add text (use built-in font if TTF not available)
+        $text_x = $x + ($badge_width / 2);
+        $text_y = $y + ($badge_height / 2);
+
+        // Try to use TrueType font if available
+        $font_path = $this->get_system_font();
+
+        if ($font_path && function_exists('imagettftext')) {
+            // Get text bounding box
+            $bbox = imagettfbbox($font_size, 0, $font_path, $badge_text);
+            $text_width = abs($bbox[4] - $bbox[0]);
+            $text_height = abs($bbox[5] - $bbox[1]);
+
+            $text_x = $x + (($badge_width - $text_width) / 2);
+            $text_y = $y + (($badge_height + $text_height) / 2);
+
+            imagettftext($image, $font_size, 0, $text_x, $text_y, $text_color, $font_path, $badge_text);
+        } else {
+            // Fallback to built-in font
+            $font = 5; // Largest built-in font
+            $text_width = imagefontwidth($font) * strlen($badge_text);
+            $text_height = imagefontheight($font);
+
+            $text_x = $x + (($badge_width - $text_width) / 2);
+            $text_y = $y + (($badge_height - $text_height) / 2);
+
+            imagestring($image, $font, $text_x, $text_y, $badge_text, $text_color);
+        }
+    }
+
+    /**
+     * Apply logo overlay to image
+     */
+    private function apply_logo_overlay($image) {
+        $logo_id = get_option('wsc_logo_attachment_id', 0);
+        $logo_position = get_option('wsc_logo_position', 'bottom-right');
+        $logo_size = intval(get_option('wsc_logo_size', 80));
+
+        if (!$logo_id) {
+            return false;
+        }
+
+        $logo_path = get_attached_file($logo_id);
+        if (!$logo_path || !file_exists($logo_path)) {
+            return false;
+        }
+
+        // Load logo image
+        $logo_info = getimagesize($logo_path);
+        if (!$logo_info) {
+            return false;
+        }
+
+        $logo_mime = $logo_info['mime'];
+
+        switch ($logo_mime) {
+            case 'image/jpeg':
+            case 'image/jpg':
+                $logo = imagecreatefromjpeg($logo_path);
+                break;
+            case 'image/png':
+                $logo = imagecreatefrompng($logo_path);
+                break;
+            case 'image/gif':
+                $logo = imagecreatefromgif($logo_path);
+                break;
+            default:
+                return false;
+        }
+
+        if (!$logo) {
+            return false;
+        }
+
+        // Get dimensions
+        $img_width = imagesx($image);
+        $img_height = imagesy($image);
+        $logo_width = imagesx($logo);
+        $logo_height = imagesy($logo);
+
+        // Resize logo to desired size maintaining aspect ratio
+        $logo_aspect = $logo_width / $logo_height;
+        $new_logo_width = $logo_size;
+        $new_logo_height = $logo_size / $logo_aspect;
+
+        if ($new_logo_height > $logo_size) {
+            $new_logo_height = $logo_size;
+            $new_logo_width = $logo_size * $logo_aspect;
+        }
+
+        // Create resized logo
+        $logo_resized = imagecreatetruecolor($new_logo_width, $new_logo_height);
+
+        // Preserve transparency for PNG
+        if ($logo_mime == 'image/png') {
+            imagealphablending($logo_resized, false);
+            imagesavealpha($logo_resized, true);
+            $transparent = imagecolorallocatealpha($logo_resized, 255, 255, 255, 127);
+            imagefilledrectangle($logo_resized, 0, 0, $new_logo_width, $new_logo_height, $transparent);
+        }
+
+        imagecopyresampled($logo_resized, $logo, 0, 0, 0, 0, $new_logo_width, $new_logo_height, $logo_width, $logo_height);
+
+        // Calculate position
+        $positions = $this->calculate_badge_position($img_width, $img_height, $new_logo_width, $new_logo_height, $logo_position);
+
+        // Copy logo onto image
+        imagecopy($image, $logo_resized, $positions['x'], $positions['y'], 0, 0, $new_logo_width, $new_logo_height);
+
+        imagedestroy($logo);
+        imagedestroy($logo_resized);
+
+        return true;
+    }
+
+    /**
+     * Calculate position for badge/logo
+     */
+    private function calculate_badge_position($img_width, $img_height, $badge_width, $badge_height, $position) {
+        $margin = 10; // Margin from edges
+
+        switch ($position) {
+            case 'top-left':
+                return array('x' => $margin, 'y' => $margin);
+            case 'top-right':
+                return array('x' => $img_width - $badge_width - $margin, 'y' => $margin);
+            case 'bottom-left':
+                return array('x' => $margin, 'y' => $img_height - $badge_height - $margin);
+            case 'bottom-right':
+                return array('x' => $img_width - $badge_width - $margin, 'y' => $img_height - $badge_height - $margin);
+            case 'center':
+                return array('x' => ($img_width - $badge_width) / 2, 'y' => ($img_height - $badge_height) / 2);
+            default:
+                return array('x' => $img_width - $badge_width - $margin, 'y' => $margin);
+        }
+    }
+
+    /**
+     * Draw rounded rectangle
+     */
+    private function draw_rounded_rectangle($image, $x, $y, $width, $height, $radius, $bg_color, $border_color) {
+        // Draw filled rectangle
+        imagefilledrectangle($image, $x + $radius, $y, $x + $width - $radius, $y + $height, $bg_color);
+        imagefilledrectangle($image, $x, $y + $radius, $x + $width, $y + $height - $radius, $bg_color);
+
+        // Draw corners
+        imagefilledellipse($image, $x + $radius, $y + $radius, $radius * 2, $radius * 2, $bg_color);
+        imagefilledellipse($image, $x + $width - $radius, $y + $radius, $radius * 2, $radius * 2, $bg_color);
+        imagefilledellipse($image, $x + $radius, $y + $height - $radius, $radius * 2, $radius * 2, $bg_color);
+        imagefilledellipse($image, $x + $width - $radius, $y + $height - $radius, $radius * 2, $radius * 2, $bg_color);
+
+        // Draw border
+        imagerectangle($image, $x, $y, $x + $width, $y + $height, $border_color);
+    }
+
+    /**
+     * Get system font path
+     */
+    private function get_system_font() {
+        $possible_fonts = array(
+            '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+            '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+            '/System/Library/Fonts/Helvetica.ttc',
+            'C:\\Windows\\Fonts\\arial.ttf',
+            'C:\\Windows\\Fonts\\arialbd.ttf',
+        );
+
+        foreach ($possible_fonts as $font) {
+            if (file_exists($font)) {
+                return $font;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Get badge settings
+     */
+    public function get_badge_settings() {
+        return array(
+            'badge_enabled' => get_option('wsc_badge_enabled', false),
+            'badge_text' => get_option('wsc_badge_text', 'SALE'),
+            'badge_position' => get_option('wsc_badge_position', 'top-right'),
+            'badge_bg_color' => get_option('wsc_badge_bg_color', '#FF0000'),
+            'badge_text_color' => get_option('wsc_badge_text_color', '#FFFFFF'),
+            'badge_size' => get_option('wsc_badge_size', 60),
+            'logo_enabled' => get_option('wsc_logo_enabled', false),
+            'logo_attachment_id' => get_option('wsc_logo_attachment_id', 0),
+            'logo_position' => get_option('wsc_logo_position', 'bottom-right'),
+            'logo_size' => get_option('wsc_logo_size', 80),
+        );
+    }
+
+    /**
+     * Update badge settings
+     */
+    public function update_badge_settings($settings) {
+        update_option('wsc_badge_enabled', isset($settings['badge_enabled']) ? (bool)$settings['badge_enabled'] : false);
+        update_option('wsc_badge_text', sanitize_text_field($settings['badge_text']));
+        update_option('wsc_badge_position', sanitize_text_field($settings['badge_position']));
+        update_option('wsc_badge_bg_color', sanitize_hex_color($settings['badge_bg_color']));
+        update_option('wsc_badge_text_color', sanitize_hex_color($settings['badge_text_color']));
+        update_option('wsc_badge_size', intval($settings['badge_size']));
+        update_option('wsc_logo_enabled', isset($settings['logo_enabled']) ? (bool)$settings['logo_enabled'] : false);
+        update_option('wsc_logo_attachment_id', intval($settings['logo_attachment_id']));
+        update_option('wsc_logo_position', sanitize_text_field($settings['logo_position']));
+        update_option('wsc_logo_size', intval($settings['logo_size']));
 
         return true;
     }

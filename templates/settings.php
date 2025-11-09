@@ -211,6 +211,192 @@ $total_products = wp_count_posts('product');
                 </table>
             </div>
         </div>
+
+        <!-- Badge & Logo Overlay Settings -->
+        <div class="wsc-settings-card">
+            <div class="wsc-card-header">
+                <h2><?php _e('Badge & Logo Overlay', 'woo-shop-crm'); ?></h2>
+                <p class="description">
+                    <?php _e('Add sale badges or your logo watermark to product images automatically.', 'woo-shop-crm'); ?>
+                </p>
+            </div>
+
+            <div class="wsc-card-body">
+                <?php
+                $badge_settings = $product_manager->get_badge_settings();
+                $logo_url = $badge_settings['logo_attachment_id'] ? wp_get_attachment_url($badge_settings['logo_attachment_id']) : '';
+                ?>
+
+                <form id="wsc-badge-settings-form">
+                    <!-- Text Badge Settings -->
+                    <div class="wsc-badge-section">
+                        <h3>
+                            <label>
+                                <input type="checkbox"
+                                       name="badge_enabled"
+                                       id="badge_enabled"
+                                       <?php checked($badge_settings['badge_enabled'], true); ?>>
+                                <?php _e('Enable Text Badge', 'woo-shop-crm'); ?>
+                            </label>
+                        </h3>
+
+                        <div id="badge-options" style="<?php echo $badge_settings['badge_enabled'] ? '' : 'display:none;'; ?>">
+                            <div class="wsc-form-row">
+                                <label for="badge_text"><?php _e('Badge Text', 'woo-shop-crm'); ?></label>
+                                <input type="text"
+                                       name="badge_text"
+                                       id="badge_text"
+                                       value="<?php echo esc_attr($badge_settings['badge_text']); ?>"
+                                       class="widefat"
+                                       placeholder="SALE">
+                            </div>
+
+                            <div class="wsc-form-row-grid">
+                                <div class="wsc-form-col">
+                                    <label for="badge_bg_color"><?php _e('Background Color', 'woo-shop-crm'); ?></label>
+                                    <input type="color"
+                                           name="badge_bg_color"
+                                           id="badge_bg_color"
+                                           value="<?php echo esc_attr($badge_settings['badge_bg_color']); ?>">
+                                </div>
+
+                                <div class="wsc-form-col">
+                                    <label for="badge_text_color"><?php _e('Text Color', 'woo-shop-crm'); ?></label>
+                                    <input type="color"
+                                           name="badge_text_color"
+                                           id="badge_text_color"
+                                           value="<?php echo esc_attr($badge_settings['badge_text_color']); ?>">
+                                </div>
+                            </div>
+
+                            <div class="wsc-form-row-grid">
+                                <div class="wsc-form-col">
+                                    <label for="badge_position"><?php _e('Badge Position', 'woo-shop-crm'); ?></label>
+                                    <select name="badge_position" id="badge_position" class="widefat">
+                                        <option value="top-left" <?php selected($badge_settings['badge_position'], 'top-left'); ?>>
+                                            <?php _e('Top Left', 'woo-shop-crm'); ?>
+                                        </option>
+                                        <option value="top-right" <?php selected($badge_settings['badge_position'], 'top-right'); ?>>
+                                            <?php _e('Top Right', 'woo-shop-crm'); ?>
+                                        </option>
+                                        <option value="bottom-left" <?php selected($badge_settings['badge_position'], 'bottom-left'); ?>>
+                                            <?php _e('Bottom Left', 'woo-shop-crm'); ?>
+                                        </option>
+                                        <option value="bottom-right" <?php selected($badge_settings['badge_position'], 'bottom-right'); ?>>
+                                            <?php _e('Bottom Right', 'woo-shop-crm'); ?>
+                                        </option>
+                                        <option value="center" <?php selected($badge_settings['badge_position'], 'center'); ?>>
+                                            <?php _e('Center', 'woo-shop-crm'); ?>
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <div class="wsc-form-col">
+                                    <label for="badge_size"><?php _e('Badge Size (px)', 'woo-shop-crm'); ?></label>
+                                    <input type="number"
+                                           name="badge_size"
+                                           id="badge_size"
+                                           value="<?php echo esc_attr($badge_settings['badge_size']); ?>"
+                                           min="30"
+                                           max="200"
+                                           class="widefat">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
+
+                    <!-- Logo Overlay Settings -->
+                    <div class="wsc-logo-section">
+                        <h3>
+                            <label>
+                                <input type="checkbox"
+                                       name="logo_enabled"
+                                       id="logo_enabled"
+                                       <?php checked($badge_settings['logo_enabled'], true); ?>>
+                                <?php _e('Enable Logo Watermark', 'woo-shop-crm'); ?>
+                            </label>
+                        </h3>
+
+                        <div id="logo-options" style="<?php echo $badge_settings['logo_enabled'] ? '' : 'display:none;'; ?>">
+                            <div class="wsc-form-row">
+                                <label><?php _e('Upload Logo', 'woo-shop-crm'); ?></label>
+                                <div class="wsc-logo-upload">
+                                    <input type="hidden"
+                                           name="logo_attachment_id"
+                                           id="logo_attachment_id"
+                                           value="<?php echo esc_attr($badge_settings['logo_attachment_id']); ?>">
+
+                                    <div id="logo-preview" class="wsc-logo-preview">
+                                        <?php if ($logo_url): ?>
+                                            <img src="<?php echo esc_url($logo_url); ?>" alt="Logo">
+                                            <button type="button" class="button wsc-remove-logo">&times;</button>
+                                        <?php else: ?>
+                                            <div class="wsc-logo-placeholder">
+                                                <span class="dashicons dashicons-format-image"></span>
+                                                <p><?php _e('No logo selected', 'woo-shop-crm'); ?></p>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+
+                                    <button type="button" id="wsc-upload-logo-btn" class="button">
+                                        <span class="dashicons dashicons-upload"></span>
+                                        <?php _e('Upload Logo', 'woo-shop-crm'); ?>
+                                    </button>
+                                    <input type="file"
+                                           id="logo_file_input"
+                                           accept="image/*"
+                                           style="display:none;">
+                                </div>
+                                <p class="description"><?php _e('Recommended: PNG with transparent background for best results', 'woo-shop-crm'); ?></p>
+                            </div>
+
+                            <div class="wsc-form-row-grid">
+                                <div class="wsc-form-col">
+                                    <label for="logo_position"><?php _e('Logo Position', 'woo-shop-crm'); ?></label>
+                                    <select name="logo_position" id="logo_position" class="widefat">
+                                        <option value="top-left" <?php selected($badge_settings['logo_position'], 'top-left'); ?>>
+                                            <?php _e('Top Left', 'woo-shop-crm'); ?>
+                                        </option>
+                                        <option value="top-right" <?php selected($badge_settings['logo_position'], 'top-right'); ?>>
+                                            <?php _e('Top Right', 'woo-shop-crm'); ?>
+                                        </option>
+                                        <option value="bottom-left" <?php selected($badge_settings['logo_position'], 'bottom-left'); ?>>
+                                            <?php _e('Bottom Left', 'woo-shop-crm'); ?>
+                                        </option>
+                                        <option value="bottom-right" <?php selected($badge_settings['logo_position'], 'bottom-right'); ?>>
+                                            <?php _e('Bottom Right', 'woo-shop-crm'); ?>
+                                        </option>
+                                        <option value="center" <?php selected($badge_settings['logo_position'], 'center'); ?>>
+                                            <?php _e('Center', 'woo-shop-crm'); ?>
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <div class="wsc-form-col">
+                                    <label for="logo_size"><?php _e('Logo Size (px)', 'woo-shop-crm'); ?></label>
+                                    <input type="number"
+                                           name="logo_size"
+                                           id="logo_size"
+                                           value="<?php echo esc_attr($badge_settings['logo_size']); ?>"
+                                           min="30"
+                                           max="300"
+                                           class="widefat">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="wsc-form-actions">
+                        <button type="submit" class="button button-primary button-large">
+                            <span class="dashicons dashicons-yes"></span>
+                            <?php _e('Save Badge Settings', 'woo-shop-crm'); ?>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -306,6 +492,130 @@ jQuery(document).ready(function($) {
                 $('#wsc-optimization-result')
                     .html('<div class="wsc-error-message"><span class="dashicons dashicons-no"></span> An error occurred</div>')
                     .show();
+                $button.prop('disabled', false).html(originalText);
+            }
+        });
+    });
+
+    // Toggle badge options
+    $('#badge_enabled').on('change', function() {
+        if ($(this).is(':checked')) {
+            $('#badge-options').slideDown();
+        } else {
+            $('#badge-options').slideUp();
+        }
+    });
+
+    // Toggle logo options
+    $('#logo_enabled').on('change', function() {
+        if ($(this).is(':checked')) {
+            $('#logo-options').slideDown();
+        } else {
+            $('#logo-options').slideUp();
+        }
+    });
+
+    // Logo upload button
+    $('#wsc-upload-logo-btn').on('click', function() {
+        $('#logo_file_input').click();
+    });
+
+    // Handle logo file selection
+    $('#logo_file_input').on('change', function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+
+        // Validate file type
+        if (!file.type.match('image.*')) {
+            alert('Please select an image file');
+            return;
+        }
+
+        var formData = new FormData();
+        formData.append('action', 'wsc_upload_logo');
+        formData.append('nonce', wscCRM.nonce);
+        formData.append('logo_file', file);
+
+        $.ajax({
+            url: wscCRM.ajax_url,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    // Update preview
+                    $('#logo_attachment_id').val(response.data.attachment_id);
+                    $('#logo-preview').html(
+                        '<img src="' + response.data.image_url + '" alt="Logo">' +
+                        '<button type="button" class="button wsc-remove-logo">&times;</button>'
+                    );
+                    $('<div class="notice notice-success is-dismissible"><p>' + response.data.message + '</p></div>')
+                        .insertAfter('.wrap > h1');
+                } else {
+                    $('<div class="notice notice-error is-dismissible"><p>' + response.data.message + '</p></div>')
+                        .insertAfter('.wrap > h1');
+                }
+                // Reset file input
+                $('#logo_file_input').val('');
+            },
+            error: function() {
+                $('<div class="notice notice-error is-dismissible"><p>An error occurred while uploading</p></div>')
+                    .insertAfter('.wrap > h1');
+                $('#logo_file_input').val('');
+            }
+        });
+    });
+
+    // Remove logo
+    $(document).on('click', '.wsc-remove-logo', function() {
+        if (!confirm('Remove this logo?')) return;
+
+        $('#logo_attachment_id').val('0');
+        $('#logo-preview').html(
+            '<div class="wsc-logo-placeholder">' +
+            '<span class="dashicons dashicons-format-image"></span>' +
+            '<p>No logo selected</p>' +
+            '</div>'
+        );
+    });
+
+    // Save badge settings
+    $('#wsc-badge-settings-form').on('submit', function(e) {
+        e.preventDefault();
+
+        var $form = $(this);
+        var $button = $form.find('button[type="submit"]');
+        var originalText = $button.html();
+
+        $button.prop('disabled', true).html('<span class="dashicons dashicons-update spin"></span> Saving...');
+
+        var formData = $form.serializeArray();
+        formData.push({name: 'action', value: 'wsc_save_badge_settings'});
+        formData.push({name: 'nonce', value: wscCRM.nonce});
+
+        $.ajax({
+            url: wscCRM.ajax_url,
+            type: 'POST',
+            data: $.param(formData),
+            success: function(response) {
+                if (response.success) {
+                    $('<div class="notice notice-success is-dismissible"><p>' + response.data.message + '</p></div>')
+                        .insertAfter('.wrap > h1');
+                } else {
+                    $('<div class="notice notice-error is-dismissible"><p>' + response.data.message + '</p></div>')
+                        .insertAfter('.wrap > h1');
+                }
+                $button.prop('disabled', false).html(originalText);
+
+                // Auto-hide notice
+                setTimeout(function() {
+                    $('.notice').fadeOut();
+                }, 3000);
+            },
+            error: function() {
+                $('<div class="notice notice-error is-dismissible"><p>An error occurred</p></div>')
+                    .insertAfter('.wrap > h1');
                 $button.prop('disabled', false).html(originalText);
             }
         });
