@@ -128,6 +128,9 @@ $tags = $product_manager->get_tags();
                         <th><?php _e('SKU', 'woo-shop-crm'); ?></th>
                         <th><?php _e('Price', 'woo-shop-crm'); ?></th>
                         <th><?php _e('Stock', 'woo-shop-crm'); ?></th>
+                        <?php if (defined('ICL_SITEPRESS_VERSION')): ?>
+                            <th><?php _e('Language', 'woo-shop-crm'); ?></th>
+                        <?php endif; ?>
                         <th><?php _e('Status', 'woo-shop-crm'); ?></th>
                         <th><?php _e('Actions', 'woo-shop-crm'); ?></th>
                     </tr>
@@ -168,6 +171,17 @@ $tags = $product_manager->get_tags();
                                     <span><?php _e('Not managed', 'woo-shop-crm'); ?></span>
                                 <?php endif; ?>
                             </td>
+                            <?php if (defined('ICL_SITEPRESS_VERSION')): ?>
+                                <td>
+                                    <?php
+                                    if (class_exists('WSC_WPML_Integration')) {
+                                        $wpml = WSC_WPML_Integration::get_instance();
+                                        echo $wpml->get_language_flag(icl_get_current_language());
+                                        echo '<br/><small>' . $wpml->get_translation_status($product->get_id()) . '</small>';
+                                    }
+                                    ?>
+                                </td>
+                            <?php endif; ?>
                             <td>
                                 <span class="wsc-status wsc-status-<?php echo esc_attr($product->get_status()); ?>">
                                     <?php echo esc_html(ucfirst($product->get_status())); ?>

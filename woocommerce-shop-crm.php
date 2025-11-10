@@ -113,6 +113,7 @@ class WooCommerce_Shop_CRM {
         require_once WOO_SHOP_CRM_PLUGIN_DIR . 'includes/class-order-manager.php';
         require_once WOO_SHOP_CRM_PLUGIN_DIR . 'includes/class-offer-manager.php';
         require_once WOO_SHOP_CRM_PLUGIN_DIR . 'includes/class-dashboard.php';
+        require_once WOO_SHOP_CRM_PLUGIN_DIR . 'includes/class-wpml-integration.php';
     }
 
     /**
