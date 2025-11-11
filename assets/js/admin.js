@@ -172,6 +172,36 @@
             $('#product_size').val(product.size || '');
             $('#product_material').val(product.material || '');
 
+            // Energy Efficiency
+            $('#product_energy_rating').val(product.energy_rating || '');
+
+            // Shipping & Dimensions
+            $('#product_weight').val(product.weight || '');
+            $('#product_length').val(product.length || '');
+            $('#product_width').val(product.width || '');
+            $('#product_height').val(product.height || '');
+
+            // Product Settings
+            $('#product_featured').prop('checked', product.featured || false);
+            $('#product_virtual').prop('checked', product.virtual || false);
+            $('#product_catalog_visibility').val(product.catalog_visibility || 'visible');
+
+            // Advanced Inventory
+            $('#product_low_stock_threshold').val(product.low_stock_threshold || '');
+            $('#product_sold_individually').prop('checked', product.sold_individually || false);
+            $('#product_backorders').val(product.backorders || 'no');
+
+            // Tax Settings
+            $('#product_tax_status').val(product.tax_status || 'taxable');
+            $('#product_tax_class').val(product.tax_class || '');
+
+            // Additional Information
+            $('#product_manufacturer').val(product.manufacturer || '');
+            $('#product_warranty').val(product.warranty || '');
+            $('#product_country_origin').val(product.country_origin || '');
+            $('#product_barcode').val(product.barcode || '');
+            $('#product_purchase_note').val(product.purchase_note || '');
+
             // Product image
             if (product.image_id && product.image_url) {
                 $('#product_image_id').val(product.image_id);

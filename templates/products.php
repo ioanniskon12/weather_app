@@ -210,6 +210,158 @@ $tags = $product_manager->get_tags();
                         </div>
                     </div>
 
+                    <h3><?php _e('Energy Efficiency', 'woo-shop-crm'); ?></h3>
+
+                    <div class="wsc-form-row">
+                        <label for="product_energy_rating"><?php _e('Energy Efficiency Rating', 'woo-shop-crm'); ?></label>
+                        <select name="product_energy_rating" id="product_energy_rating" class="widefat">
+                            <option value=""><?php _e('-- No Rating --', 'woo-shop-crm'); ?></option>
+                            <option value="A+++"><?php _e('A+++ (Most Efficient)', 'woo-shop-crm'); ?></option>
+                            <option value="A++"><?php _e('A++', 'woo-shop-crm'); ?></option>
+                            <option value="A+"><?php _e('A+', 'woo-shop-crm'); ?></option>
+                            <option value="A"><?php _e('A', 'woo-shop-crm'); ?></option>
+                            <option value="B"><?php _e('B', 'woo-shop-crm'); ?></option>
+                            <option value="C"><?php _e('C', 'woo-shop-crm'); ?></option>
+                            <option value="D"><?php _e('D', 'woo-shop-crm'); ?></option>
+                            <option value="E"><?php _e('E', 'woo-shop-crm'); ?></option>
+                            <option value="F"><?php _e('F', 'woo-shop-crm'); ?></option>
+                            <option value="G"><?php _e('G (Least Efficient)', 'woo-shop-crm'); ?></option>
+                        </select>
+                        <p class="description"><?php _e('This will display an energy efficiency badge in your product description', 'woo-shop-crm'); ?></p>
+                    </div>
+
+                    <h3><?php _e('Shipping & Dimensions', 'woo-shop-crm'); ?></h3>
+
+                    <div class="wsc-form-row-grid">
+                        <div class="wsc-form-col">
+                            <label for="product_weight"><?php _e('Weight (kg)', 'woo-shop-crm'); ?></label>
+                            <input type="number" step="0.01" name="product_weight" id="product_weight" class="widefat" placeholder="0.00">
+                        </div>
+
+                        <div class="wsc-form-col">
+                            <label for="product_length"><?php _e('Length (cm)', 'woo-shop-crm'); ?></label>
+                            <input type="number" step="0.01" name="product_length" id="product_length" class="widefat" placeholder="0.00">
+                        </div>
+                    </div>
+
+                    <div class="wsc-form-row-grid">
+                        <div class="wsc-form-col">
+                            <label for="product_width"><?php _e('Width (cm)', 'woo-shop-crm'); ?></label>
+                            <input type="number" step="0.01" name="product_width" id="product_width" class="widefat" placeholder="0.00">
+                        </div>
+
+                        <div class="wsc-form-col">
+                            <label for="product_height"><?php _e('Height (cm)', 'woo-shop-crm'); ?></label>
+                            <input type="number" step="0.01" name="product_height" id="product_height" class="widefat" placeholder="0.00">
+                        </div>
+                    </div>
+
+                    <h3><?php _e('Product Settings', 'woo-shop-crm'); ?></h3>
+
+                    <div class="wsc-form-row">
+                        <label>
+                            <input type="checkbox" name="product_featured" id="product_featured" value="1">
+                            <?php _e('Featured Product', 'woo-shop-crm'); ?>
+                        </label>
+                        <p class="description"><?php _e('Display this product in featured sections', 'woo-shop-crm'); ?></p>
+                    </div>
+
+                    <div class="wsc-form-row">
+                        <label>
+                            <input type="checkbox" name="product_virtual" id="product_virtual" value="1">
+                            <?php _e('Virtual Product', 'woo-shop-crm'); ?>
+                        </label>
+                        <p class="description"><?php _e('No shipping required (e.g., services, digital products)', 'woo-shop-crm'); ?></p>
+                    </div>
+
+                    <div class="wsc-form-row">
+                        <label for="product_catalog_visibility"><?php _e('Catalog Visibility', 'woo-shop-crm'); ?></label>
+                        <select name="product_catalog_visibility" id="product_catalog_visibility" class="widefat">
+                            <option value="visible"><?php _e('Shop and Search Results', 'woo-shop-crm'); ?></option>
+                            <option value="catalog"><?php _e('Shop Only', 'woo-shop-crm'); ?></option>
+                            <option value="search"><?php _e('Search Results Only', 'woo-shop-crm'); ?></option>
+                            <option value="hidden"><?php _e('Hidden', 'woo-shop-crm'); ?></option>
+                        </select>
+                    </div>
+
+                    <h3><?php _e('Advanced Inventory', 'woo-shop-crm'); ?></h3>
+
+                    <div class="wsc-form-row">
+                        <label for="product_low_stock_threshold"><?php _e('Low Stock Threshold', 'woo-shop-crm'); ?></label>
+                        <input type="number" name="product_low_stock_threshold" id="product_low_stock_threshold" class="widefat" placeholder="<?php _e('Default: 5', 'woo-shop-crm'); ?>">
+                        <p class="description"><?php _e('When stock reaches this amount, you will be notified', 'woo-shop-crm'); ?></p>
+                    </div>
+
+                    <div class="wsc-form-row">
+                        <label>
+                            <input type="checkbox" name="product_sold_individually" id="product_sold_individually" value="1">
+                            <?php _e('Sold Individually', 'woo-shop-crm'); ?>
+                        </label>
+                        <p class="description"><?php _e('Limit purchase to 1 item per order', 'woo-shop-crm'); ?></p>
+                    </div>
+
+                    <div class="wsc-form-row">
+                        <label for="product_backorders"><?php _e('Allow Backorders', 'woo-shop-crm'); ?></label>
+                        <select name="product_backorders" id="product_backorders" class="widefat">
+                            <option value="no"><?php _e('Do Not Allow', 'woo-shop-crm'); ?></option>
+                            <option value="notify"><?php _e('Allow, but Notify Customer', 'woo-shop-crm'); ?></option>
+                            <option value="yes"><?php _e('Allow', 'woo-shop-crm'); ?></option>
+                        </select>
+                    </div>
+
+                    <h3><?php _e('Tax Settings', 'woo-shop-crm'); ?></h3>
+
+                    <div class="wsc-form-row-grid">
+                        <div class="wsc-form-col">
+                            <label for="product_tax_status"><?php _e('Tax Status', 'woo-shop-crm'); ?></label>
+                            <select name="product_tax_status" id="product_tax_status" class="widefat">
+                                <option value="taxable"><?php _e('Taxable', 'woo-shop-crm'); ?></option>
+                                <option value="shipping"><?php _e('Shipping Only', 'woo-shop-crm'); ?></option>
+                                <option value="none"><?php _e('None', 'woo-shop-crm'); ?></option>
+                            </select>
+                        </div>
+
+                        <div class="wsc-form-col">
+                            <label for="product_tax_class"><?php _e('Tax Class', 'woo-shop-crm'); ?></label>
+                            <select name="product_tax_class" id="product_tax_class" class="widefat">
+                                <option value=""><?php _e('Standard', 'woo-shop-crm'); ?></option>
+                                <option value="reduced-rate"><?php _e('Reduced Rate', 'woo-shop-crm'); ?></option>
+                                <option value="zero-rate"><?php _e('Zero Rate', 'woo-shop-crm'); ?></option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <h3><?php _e('Additional Information', 'woo-shop-crm'); ?></h3>
+
+                    <div class="wsc-form-row-grid">
+                        <div class="wsc-form-col">
+                            <label for="product_manufacturer"><?php _e('Manufacturer', 'woo-shop-crm'); ?></label>
+                            <input type="text" name="product_manufacturer" id="product_manufacturer" class="widefat" placeholder="<?php _e('Product manufacturer', 'woo-shop-crm'); ?>">
+                        </div>
+
+                        <div class="wsc-form-col">
+                            <label for="product_warranty"><?php _e('Warranty Period', 'woo-shop-crm'); ?></label>
+                            <input type="text" name="product_warranty" id="product_warranty" class="widefat" placeholder="<?php _e('e.g., 2 years', 'woo-shop-crm'); ?>">
+                        </div>
+                    </div>
+
+                    <div class="wsc-form-row-grid">
+                        <div class="wsc-form-col">
+                            <label for="product_country_origin"><?php _e('Country of Origin', 'woo-shop-crm'); ?></label>
+                            <input type="text" name="product_country_origin" id="product_country_origin" class="widefat" placeholder="<?php _e('e.g., Germany', 'woo-shop-crm'); ?>">
+                        </div>
+
+                        <div class="wsc-form-col">
+                            <label for="product_barcode"><?php _e('Barcode / EAN', 'woo-shop-crm'); ?></label>
+                            <input type="text" name="product_barcode" id="product_barcode" class="widefat" placeholder="<?php _e('Product barcode', 'woo-shop-crm'); ?>">
+                        </div>
+                    </div>
+
+                    <div class="wsc-form-row">
+                        <label for="product_purchase_note"><?php _e('Purchase Note', 'woo-shop-crm'); ?></label>
+                        <textarea name="product_purchase_note" id="product_purchase_note" rows="3" class="widefat" placeholder="<?php _e('Note to customer after purchase', 'woo-shop-crm'); ?>"></textarea>
+                    </div>
+
                     <div class="wsc-form-actions">
                         <button type="submit" class="button button-primary button-large">
                             <?php _e('Save Product', 'woo-shop-crm'); ?>

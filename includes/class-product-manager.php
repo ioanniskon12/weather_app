@@ -87,6 +87,13 @@ class WSC_Product_Manager {
         $size = get_post_meta($product_id, '_product_size', true);
         $material = get_post_meta($product_id, '_product_material', true);
 
+        // Get additional information
+        $manufacturer = get_post_meta($product_id, '_product_manufacturer', true);
+        $warranty = get_post_meta($product_id, '_product_warranty', true);
+        $country_origin = get_post_meta($product_id, '_product_country_origin', true);
+        $barcode = get_post_meta($product_id, '_product_barcode', true);
+        $energy_rating = get_post_meta($product_id, '_product_energy_rating', true);
+
         // Get images
         $image_id = $product->get_image_id();
         $gallery_ids = $product->get_gallery_image_ids();
@@ -104,12 +111,30 @@ class WSC_Product_Manager {
             'manage_stock' => $product->get_manage_stock(),
             'stock_quantity' => $product->get_stock_quantity(),
             'stock_status' => $product->get_stock_status(),
+            'low_stock_threshold' => $product->get_low_stock_amount(),
+            'sold_individually' => $product->get_sold_individually(),
+            'backorders' => $product->get_backorders(),
+            'weight' => $product->get_weight(),
+            'length' => $product->get_length(),
+            'width' => $product->get_width(),
+            'height' => $product->get_height(),
+            'featured' => $product->get_featured(),
+            'virtual' => $product->get_virtual(),
+            'catalog_visibility' => $product->get_catalog_visibility(),
+            'tax_status' => $product->get_tax_status(),
+            'tax_class' => $product->get_tax_class(),
+            'purchase_note' => $product->get_purchase_note(),
             'category_ids' => $category_ids,
             'tags' => implode(', ', $tag_names),
             'brand' => $brand,
             'color' => $color,
             'size' => $size,
             'material' => $material,
+            'manufacturer' => $manufacturer,
+            'warranty' => $warranty,
+            'country_origin' => $country_origin,
+            'barcode' => $barcode,
+            'energy_rating' => $energy_rating,
             'image_id' => $image_id,
             'image_url' => $image_id ? wp_get_attachment_url($image_id) : '',
             'gallery_ids' => $gallery_ids,
@@ -190,8 +215,70 @@ class WSC_Product_Manager {
             if ($manage_stock) {
                 $product->set_stock_quantity($product_stock);
                 $product->set_stock_status($product_stock_status);
+
+                // Low stock threshold
+                if (isset($data['product_low_stock_threshold']) && $data['product_low_stock_threshold'] !== '') {
+                    $product->set_low_stock_amount(intval($data['product_low_stock_threshold']));
+                }
             } else {
                 $product->set_stock_status($product_stock_status);
+            }
+
+            // Advanced inventory settings
+            if (isset($data['product_sold_individually']) && $data['product_sold_individually'] == '1') {
+                $product->set_sold_individually(true);
+            } else {
+                $product->set_sold_individually(false);
+            }
+
+            // Backorders
+            if (isset($data['product_backorders'])) {
+                $product->set_backorders(sanitize_text_field($data['product_backorders']));
+            }
+
+            // Shipping & dimensions
+            if (isset($data['product_weight']) && !empty($data['product_weight'])) {
+                $product->set_weight(floatval($data['product_weight']));
+            }
+            if (isset($data['product_length']) && !empty($data['product_length'])) {
+                $product->set_length(floatval($data['product_length']));
+            }
+            if (isset($data['product_width']) && !empty($data['product_width'])) {
+                $product->set_width(floatval($data['product_width']));
+            }
+            if (isset($data['product_height']) && !empty($data['product_height'])) {
+                $product->set_height(floatval($data['product_height']));
+            }
+
+            // Product settings
+            if (isset($data['product_featured']) && $data['product_featured'] == '1') {
+                $product->set_featured(true);
+            } else {
+                $product->set_featured(false);
+            }
+
+            if (isset($data['product_virtual']) && $data['product_virtual'] == '1') {
+                $product->set_virtual(true);
+            } else {
+                $product->set_virtual(false);
+            }
+
+            // Catalog visibility
+            if (isset($data['product_catalog_visibility'])) {
+                $product->set_catalog_visibility(sanitize_text_field($data['product_catalog_visibility']));
+            }
+
+            // Tax settings
+            if (isset($data['product_tax_status'])) {
+                $product->set_tax_status(sanitize_text_field($data['product_tax_status']));
+            }
+            if (isset($data['product_tax_class'])) {
+                $product->set_tax_class(sanitize_text_field($data['product_tax_class']));
+            }
+
+            // Purchase note
+            if (isset($data['product_purchase_note'])) {
+                $product->set_purchase_note(wp_kses_post($data['product_purchase_note']));
             }
 
             $product->set_status('publish');
@@ -260,6 +347,31 @@ class WSC_Product_Manager {
                 }
                 if (isset($data['product_material']) && !empty($data['product_material'])) {
                     update_post_meta($saved_id, '_product_material', sanitize_text_field($data['product_material']));
+                }
+
+                // Additional information
+                if (isset($data['product_manufacturer']) && !empty($data['product_manufacturer'])) {
+                    update_post_meta($saved_id, '_product_manufacturer', sanitize_text_field($data['product_manufacturer']));
+                }
+                if (isset($data['product_warranty']) && !empty($data['product_warranty'])) {
+                    update_post_meta($saved_id, '_product_warranty', sanitize_text_field($data['product_warranty']));
+                }
+                if (isset($data['product_country_origin']) && !empty($data['product_country_origin'])) {
+                    update_post_meta($saved_id, '_product_country_origin', sanitize_text_field($data['product_country_origin']));
+                }
+                if (isset($data['product_barcode']) && !empty($data['product_barcode'])) {
+                    update_post_meta($saved_id, '_product_barcode', sanitize_text_field($data['product_barcode']));
+                }
+
+                // Energy efficiency rating
+                if (isset($data['product_energy_rating'])) {
+                    $energy_rating = sanitize_text_field($data['product_energy_rating']);
+                    update_post_meta($saved_id, '_product_energy_rating', $energy_rating);
+
+                    // Add energy badge to description if rating is set
+                    if (!empty($energy_rating)) {
+                        $this->add_energy_badge_to_description($saved_id, $energy_rating);
+                    }
                 }
             }
 
@@ -950,6 +1062,55 @@ class WSC_Product_Manager {
         update_option('wsc_logo_attachment_id', intval($settings['logo_attachment_id']));
         update_option('wsc_logo_position', sanitize_text_field($settings['logo_position']));
         update_option('wsc_logo_size', intval($settings['logo_size']));
+
+        return true;
+    }
+
+    /**
+     * Add energy efficiency badge to product description
+     */
+    private function add_energy_badge_to_description($product_id, $rating) {
+        $product = wc_get_product($product_id);
+        if (!$product) {
+            return false;
+        }
+
+        // Get current description
+        $description = $product->get_description();
+
+        // Remove existing energy badge if present
+        $description = preg_replace('/<div class="wsc-energy-badge">.*?<\/div>/s', '', $description);
+
+        // Get color based on rating
+        $colors = array(
+            'A+++' => array('bg' => '#00a651', 'text' => '#ffffff'),
+            'A++' => array('bg' => '#4daf4e', 'text' => '#ffffff'),
+            'A+' => array('bg' => '#7bc043', 'text' => '#ffffff'),
+            'A' => array('bg' => '#c3d600', 'text' => '#000000'),
+            'B' => array('bg' => '#fef200', 'text' => '#000000'),
+            'C' => array('bg' => '#fcb913', 'text' => '#000000'),
+            'D' => array('bg' => '#f57e20', 'text' => '#ffffff'),
+            'E' => array('bg' => '#ed1c24', 'text' => '#ffffff'),
+            'F' => array('bg' => '#d01012', 'text' => '#ffffff'),
+            'G' => array('bg' => '#a50034', 'text' => '#ffffff'),
+        );
+
+        $color_scheme = isset($colors[$rating]) ? $colors[$rating] : $colors['A'];
+
+        // Create energy badge HTML
+        $badge_html = '<div class="wsc-energy-badge" style="display: inline-block; margin: 10px 0 15px 0; padding: 12px 20px; background: ' . $color_scheme['bg'] . '; color: ' . $color_scheme['text'] . '; border-radius: 8px; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">';
+        $badge_html .= '<svg style="display: inline-block; vertical-align: middle; margin-right: 8px;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">';
+        $badge_html .= '<path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z" fill="' . $color_scheme['text'] . '"/>';
+        $badge_html .= '</svg>';
+        $badge_html .= '<span style="font-size: 16px; vertical-align: middle;">Energy Efficiency: ' . esc_html($rating) . '</span>';
+        $badge_html .= '</div>';
+
+        // Add badge to beginning of description
+        $new_description = $badge_html . $description;
+
+        // Update product description
+        $product->set_description($new_description);
+        $product->save();
 
         return true;
     }
