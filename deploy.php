@@ -21,7 +21,7 @@
 // ============================================
 
 // Secret key for security (change this!)
-define('DEPLOY_SECRET', 'your-secret-key-change-this-123456');
+define('DEPLOY_SECRET', '2K@LIspera1821');
 
 // Your GitHub repository
 define('GITHUB_REPO', 'ioanniskon12/weather_app');
