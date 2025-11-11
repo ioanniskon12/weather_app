@@ -95,6 +95,7 @@ class WooCommerce_Shop_CRM {
 
         // AJAX handlers
         add_action('wp_ajax_wsc_save_product', array($this, 'ajax_save_product'));
+        add_action('wp_ajax_wsc_get_product', array($this, 'ajax_get_product'));
         add_action('wp_ajax_wsc_delete_product', array($this, 'ajax_delete_product'));
         add_action('wp_ajax_wsc_update_order_status', array($this, 'ajax_update_order_status'));
         add_action('wp_ajax_wsc_save_offer', array($this, 'ajax_save_offer'));
@@ -303,9 +304,30 @@ class WooCommerce_Shop_CRM {
         $result = $product_manager->save_product($_POST);
 
         if ($result) {
-            wp_send_json_success(array('message' => 'Product saved successfully'));
+            wp_send_json_success(array('message' => 'Product saved successfully', 'product_id' => $result));
         } else {
             wp_send_json_error(array('message' => 'Failed to save product'));
+        }
+    }
+
+    /**
+     * AJAX: Get product for editing
+     */
+    public function ajax_get_product() {
+        check_ajax_referer('wsc_crm_nonce', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(array('message' => 'Unauthorized'));
+        }
+
+        $product_id = intval($_POST['product_id']);
+        $product_manager = new WSC_Product_Manager();
+        $product_data = $product_manager->get_product_for_edit($product_id);
+
+        if ($product_data) {
+            wp_send_json_success(array('product' => $product_data));
+        } else {
+            wp_send_json_error(array('message' => 'Product not found'));
         }
     }
 
