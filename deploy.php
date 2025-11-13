@@ -1,4 +1,10 @@
 <?php
+// Handle GitHub webhook redirects
+if (isset($_SERVER['HTTP_USER_AGENT']) && strpos($_SERVER['HTTP_USER_AGENT'], 'GitHub-Hookshot') !== false) {
+    http_response_code(200);
+    header('Content-Type: text/plain');
+}
+
 /**
  * GitHub Auto-Deploy Script
  *
