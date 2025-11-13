@@ -1,5 +1,7 @@
 # WooCommerce Shop CRM
 
+**🔄 Testing automatic deployment...**
+
 A comprehensive CRM plugin for WooCommerce shop owners to manage products, orders, and offers all in one centralized dashboard.
 
 ## Features
