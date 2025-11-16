@@ -230,9 +230,8 @@ class WSC_Background_Remover {
                 // Show visible notification
                 alert('🎨 Background Remover Active!\n\nThis page will process product images.\nCheck console (F12) for progress.');
 
-                // Import the background removal library
-                // Using jsdelivr with +esm for automatic module resolution
-                import removeBackground from 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm';
+                // Import the background removal library using Skypack CDN (better dependency resolution)
+                import removeBackground from 'https://cdn.skypack.dev/@imgly/background-removal@1.4.5';
 
                 async function processImages() {
                     const images = document.querySelectorAll('<?php echo esc_js($image_selector); ?>');
