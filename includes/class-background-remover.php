@@ -2,7 +2,7 @@
 /**
  * Background Remover Class
  *
- * Automatically removes backgrounds from product images on specific pages
+ * Pre-processes product images to remove backgrounds (admin-side batch processing)
  */
 
 // Exit if accessed directly
@@ -16,60 +16,16 @@ class WSC_Background_Remover {
         // Register settings
         add_action('admin_init', array($this, 'register_settings'));
 
-        // Enqueue scripts on frontend
-        add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_scripts'));
-
-        // Add debug banner to footer on ALL pages (temporary)
-        add_action('wp_footer', array($this, 'debug_banner'), 1);
-    }
-
-    /**
-     * Debug banner - shows if feature would activate on this page
-     */
-    public function debug_banner() {
-        $is_enabled = get_option('wsc_abr_enabled', 0);
-        $target_urls = get_option('wsc_abr_target_urls', "/black-friday\n/en/black-friday");
-        $current_url = $_SERVER['REQUEST_URI'];
-        $current_url_trimmed = rtrim($current_url, '/');
-
-        $target_urls_array = explode("\n", $target_urls);
-        $matches = [];
-        foreach ($target_urls_array as $url) {
-            $url = rtrim(trim($url), '/');
-            if (!empty($url)) {
-                $matches[] = $url;
-            }
-        }
-
-        ?>
-        <div style="position: fixed; bottom: 0; left: 0; right: 0; background: #000; color: #0f0; padding: 10px; font-family: monospace; font-size: 12px; z-index: 999999; border-top: 2px solid #0f0;">
-            <strong>🎨 Background Remover Debug:</strong><br>
-            Enabled: <?php echo $is_enabled ? '✅ YES' : '❌ NO'; ?><br>
-            Current URL: <code><?php echo esc_html($current_url); ?></code><br>
-            Current URL (trimmed): <code><?php echo esc_html($current_url_trimmed); ?></code><br>
-            Target URLs: <code><?php echo esc_html(implode(', ', $matches)); ?></code><br>
-            Match: <?php
-                $found = false;
-                foreach ($matches as $m) {
-                    if ($current_url_trimmed === $m) {
-                        echo '✅ YES - Script will load!';
-                        $found = true;
-                        break;
-                    }
-                }
-                if (!$found) echo '❌ NO';
-            ?>
-        </div>
-        <?php
+        // AJAX handlers for processing images
+        add_action('wp_ajax_wsc_get_products_for_bg_removal', array($this, 'ajax_get_products'));
+        add_action('wp_ajax_wsc_save_processed_image', array($this, 'ajax_save_processed_image'));
     }
 
     /**
      * Register plugin settings
      */
     public function register_settings() {
-        register_setting('wsc_bg_remover_settings', 'wsc_abr_target_urls');
-        register_setting('wsc_bg_remover_settings', 'wsc_abr_image_selector');
-        register_setting('wsc_bg_remover_settings', 'wsc_abr_enabled');
+        register_setting('wsc_bg_remover_settings', 'wsc_abr_product_category');
     }
 
     /**
@@ -78,232 +34,382 @@ class WSC_Background_Remover {
     public function settings_page() {
         ?>
         <div class="wrap">
-            <h1>🎨 Background Remover Settings</h1>
-            <p>Configure which pages should have automatic background removal for product images.</p>
+            <h1>🎨 Background Remover</h1>
+            <p>Process product images to remove backgrounds permanently.</p>
 
-            <form method="post" action="options.php">
-                <?php
-                settings_fields('wsc_bg_remover_settings');
-                do_settings_sections('wsc_bg_remover_settings');
-                ?>
+            <div class="card" style="max-width: 100%; margin-top: 20px;">
+                <h2>Batch Process Products</h2>
+                <p>Select which products to process and click "Start Processing" to remove backgrounds from all product images.</p>
 
                 <table class="form-table">
                     <tr>
                         <th scope="row">
-                            <label for="wsc_abr_enabled">Enable Background Removal</label>
+                            <label for="wsc_product_category">Product Category</label>
                         </th>
                         <td>
-                            <input type="checkbox"
-                                   id="wsc_abr_enabled"
-                                   name="wsc_abr_enabled"
-                                   value="1"
-                                   <?php checked(1, get_option('wsc_abr_enabled', 0)); ?> />
-                            <p class="description">Turn on/off the background removal feature.</p>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <th scope="row">
-                            <label for="wsc_abr_target_urls">Target URLs</label>
-                        </th>
-                        <td>
-                            <textarea id="wsc_abr_target_urls"
-                                      name="wsc_abr_target_urls"
-                                      rows="5"
-                                      class="large-text"><?php echo esc_textarea(get_option('wsc_abr_target_urls', "/black-friday\n/en/black-friday")); ?></textarea>
-                            <p class="description">
-                                Enter exact URL paths (one per line) where background removal should work.<br>
-                                Examples: <code>/black-friday</code> or <code>/en/black-friday</code><br>
-                                <strong>Note:</strong> Must match exactly (e.g., /black-friday will NOT match /black-friday/products)
-                            </p>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <th scope="row">
-                            <label for="wsc_abr_image_selector">Image Selector (CSS)</label>
-                        </th>
-                        <td>
-                            <input type="text"
-                                   id="wsc_abr_image_selector"
-                                   name="wsc_abr_image_selector"
-                                   value="<?php echo esc_attr(get_option('wsc_abr_image_selector', '.woocommerce-product-gallery img, .product img, .products img, img.attachment-woocommerce_thumbnail')); ?>"
-                                   class="large-text" />
-                            <p class="description">
-                                CSS selector for images to process. Default targets only WooCommerce product images.<br>
-                                Current default: <code>.woocommerce-product-gallery img, .product img, .products img</code><br>
-                                This excludes logos, banners, icons, and other non-product images.
-                            </p>
+                            <select id="wsc_product_category" style="min-width: 300px;">
+                                <option value="">All Products</option>
+                                <?php
+                                $categories = get_terms(array(
+                                    'taxonomy' => 'product_cat',
+                                    'hide_empty' => false,
+                                ));
+                                foreach ($categories as $category) {
+                                    echo '<option value="' . esc_attr($category->term_id) . '">' . esc_html($category->name) . '</option>';
+                                }
+                                ?>
+                            </select>
+                            <p class="description">Choose a category or process all products</p>
                         </td>
                     </tr>
                 </table>
 
-                <?php submit_button(); ?>
-            </form>
+                <p>
+                    <button type="button" id="wsc-start-bg-removal" class="button button-primary button-large">
+                        🎨 Start Processing
+                    </button>
+                    <button type="button" id="wsc-stop-bg-removal" class="button button-secondary" style="display:none;">
+                        ⏸️ Stop
+                    </button>
+                </p>
 
-            <hr>
+                <div id="wsc-bg-removal-progress" style="display:none; margin-top: 20px;">
+                    <h3>Processing...</h3>
+                    <progress id="wsc-progress-bar" max="100" value="0" style="width: 100%; height: 30px;"></progress>
+                    <p id="wsc-progress-text">Preparing...</p>
 
-            <h2>ℹ️ How It Works</h2>
-            <ul>
-                <li>✅ <strong>No API Key Required</strong> - Uses free client-side AI processing</li>
-                <li>✅ <strong>Automatic Processing</strong> - Removes backgrounds when page loads</li>
-                <li>✅ <strong>Smart Caching</strong> - Processed images are cached in browser</li>
-                <li>✅ <strong>Product Images Only</strong> - Excludes logos, banners, and icons</li>
-                <li>⚠️ <strong>Note:</strong> First load may take a few seconds per image</li>
-            </ul>
-
-            <h2>🎯 Current Configuration</h2>
-            <p><strong>Status:</strong> <?php echo get_option('wsc_abr_enabled', 0) ? '✅ Enabled' : '❌ Disabled'; ?></p>
-            <p><strong>Active on exact URLs:</strong></p>
-            <ul>
-                <?php
-                $urls = explode("\n", get_option('wsc_abr_target_urls', "/black-friday\n/en/black-friday"));
-                foreach ($urls as $url) {
-                    $url = trim($url);
-                    if (!empty($url)) {
-                        echo '<li><code>' . esc_html($url) . '</code> → <code>https://www.kontopyrgos.com.cy' . esc_html($url) . '</code></li>';
-                    }
-                }
-                ?>
-            </ul>
+                    <div id="wsc-processed-list" style="margin-top: 20px; max-height: 400px; overflow-y: auto; background: #f5f5f5; padding: 15px; border-radius: 5px;">
+                        <h4>Processing Log:</h4>
+                        <ul id="wsc-log-list" style="list-style: none; padding: 0; font-family: monospace; font-size: 12px;"></ul>
+                    </div>
+                </div>
+            </div>
         </div>
 
+        <script type="module">
+            let processing = false;
+            let shouldStop = false;
+
+            document.getElementById('wsc-start-bg-removal').addEventListener('click', async function() {
+                if (processing) return;
+
+                processing = true;
+                shouldStop = false;
+                this.style.display = 'none';
+                document.getElementById('wsc-stop-bg-removal').style.display = 'inline-block';
+                document.getElementById('wsc-bg-removal-progress').style.display = 'block';
+
+                const categoryId = document.getElementById('wsc_product_category').value;
+
+                addLog('🔍 Fetching products...');
+
+                // Get products to process
+                const formData = new FormData();
+                formData.append('action', 'wsc_get_products_for_bg_removal');
+                formData.append('nonce', '<?php echo wp_create_nonce('wsc_crm_nonce'); ?>');
+                formData.append('category_id', categoryId);
+
+                const response = await fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    addLog('❌ Error: ' + data.data.message, 'error');
+                    resetButtons();
+                    return;
+                }
+
+                const products = data.data.products;
+                addLog(`✅ Found ${products.length} products to process`);
+
+                // Import background removal library
+                addLog('📦 Loading background removal library...');
+                const { default: removeBackground } = await import('https://esm.sh/@imgly/background-removal@1.4.5?bundle');
+                addLog('✅ Library loaded');
+
+                // Process each product
+                let processed = 0;
+                let failed = 0;
+
+                for (let i = 0; i < products.length; i++) {
+                    if (shouldStop) {
+                        addLog('⏸️ Processing stopped by user');
+                        break;
+                    }
+
+                    const product = products[i];
+                    const progress = Math.round(((i + 1) / products.length) * 100);
+                    document.getElementById('wsc-progress-bar').value = progress;
+                    document.getElementById('wsc-progress-text').textContent =
+                        `Processing ${i + 1} of ${products.length}: ${product.name}`;
+
+                    addLog(`🖼️ Processing: ${product.name}`);
+
+                    // Process each image in the product
+                    for (const imageUrl of product.images) {
+                        try {
+                            addLog(`  → Removing background from: ${imageUrl.split('/').pop()}`);
+
+                            const blob = await removeBackground(imageUrl);
+
+                            // Convert blob to base64
+                            const base64 = await blobToBase64(blob);
+
+                            // Send to server to save
+                            const saveData = new FormData();
+                            saveData.append('action', 'wsc_save_processed_image');
+                            saveData.append('nonce', '<?php echo wp_create_nonce('wsc_crm_nonce'); ?>');
+                            saveData.append('product_id', product.id);
+                            saveData.append('image_url', imageUrl);
+                            saveData.append('image_data', base64);
+
+                            const saveResponse = await fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                                method: 'POST',
+                                body: saveData
+                            });
+
+                            const saveResult = await saveResponse.json();
+
+                            if (saveResult.success) {
+                                addLog(`  ✅ Saved: ${saveResult.data.filename}`, 'success');
+                                processed++;
+                            } else {
+                                addLog(`  ❌ Failed to save: ${saveResult.data.message}`, 'error');
+                                failed++;
+                            }
+
+                        } catch (error) {
+                            addLog(`  ❌ Error: ${error.message}`, 'error');
+                            failed++;
+                        }
+
+                        // Small delay to prevent browser freeze
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                }
+
+                addLog(`\n🎉 Processing complete!`);
+                addLog(`✅ Successfully processed: ${processed} images`);
+                if (failed > 0) {
+                    addLog(`❌ Failed: ${failed} images`, 'error');
+                }
+
+                resetButtons();
+            });
+
+            document.getElementById('wsc-stop-bg-removal').addEventListener('click', function() {
+                shouldStop = true;
+                addLog('⏸️ Stopping after current image...');
+            });
+
+            function addLog(message, type = 'info') {
+                const logList = document.getElementById('wsc-log-list');
+                const li = document.createElement('li');
+                li.textContent = new Date().toLocaleTimeString() + ' - ' + message;
+
+                if (type === 'success') li.style.color = 'green';
+                if (type === 'error') li.style.color = 'red';
+
+                logList.appendChild(li);
+                logList.scrollTop = logList.scrollHeight;
+            }
+
+            function resetButtons() {
+                processing = false;
+                document.getElementById('wsc-start-bg-removal').style.display = 'inline-block';
+                document.getElementById('wsc-stop-bg-removal').style.display = 'none';
+                document.getElementById('wsc-progress-bar').value = 100;
+                document.getElementById('wsc-progress-text').textContent = 'Complete!';
+            }
+
+            async function blobToBase64(blob) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+            }
+        </script>
+
         <style>
-            .wrap h1 { color: #2271b1; }
-            .wrap h2 { margin-top: 20px; }
-            .wrap ul { list-style: disc; margin-left: 20px; }
-            .wrap code { background: #f0f0f1; padding: 2px 6px; border-radius: 3px; }
+            #wsc-log-list li {
+                padding: 5px 0;
+                border-bottom: 1px solid #ddd;
+            }
+            #wsc-progress-bar {
+                -webkit-appearance: none;
+                appearance: none;
+            }
+            #wsc-progress-bar::-webkit-progress-bar {
+                background-color: #f3f3f3;
+                border-radius: 3px;
+            }
+            #wsc-progress-bar::-webkit-progress-value {
+                background-color: #2271b1;
+                border-radius: 3px;
+            }
         </style>
         <?php
     }
 
     /**
-     * Enqueue frontend scripts
+     * AJAX: Get products for background removal
      */
-    public function enqueue_frontend_scripts() {
-        // Debug: Log to PHP error log
-        error_log('WSC Background Remover: enqueue_frontend_scripts called');
+    public function ajax_get_products() {
+        check_ajax_referer('wsc_crm_nonce', 'nonce');
 
-        // Check if enabled
-        $is_enabled = get_option('wsc_abr_enabled', 0);
-        error_log('WSC Background Remover: Enabled = ' . ($is_enabled ? 'YES' : 'NO'));
-
-        if (!$is_enabled) {
-            return;
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(array('message' => 'Unauthorized'));
         }
 
-        // Check if current page matches target URLs (exact match)
-        $target_urls = explode("\n", get_option('wsc_abr_target_urls', "/black-friday\n/en/black-friday"));
-        $current_url = rtrim($_SERVER['REQUEST_URI'], '/'); // Remove trailing slash
-        error_log('WSC Background Remover: Current URL = ' . $current_url);
+        $category_id = isset($_POST['category_id']) ? intval($_POST['category_id']) : 0;
 
-        $is_target_page = false;
+        $args = array(
+            'post_type' => 'product',
+            'posts_per_page' => -1,
+            'post_status' => 'publish',
+        );
 
-        foreach ($target_urls as $url) {
-            $url = rtrim(trim($url), '/'); // Remove trailing slash and whitespace
-            error_log('WSC Background Remover: Checking URL = ' . $url);
-            if (!empty($url) && $current_url === $url) {
-                $is_target_page = true;
-                error_log('WSC Background Remover: MATCH! Will load script');
-                break;
+        if ($category_id > 0) {
+            $args['tax_query'] = array(
+                array(
+                    'taxonomy' => 'product_cat',
+                    'field' => 'term_id',
+                    'terms' => $category_id,
+                ),
+            );
+        }
+
+        $products = get_posts($args);
+        $product_data = array();
+
+        foreach ($products as $product_post) {
+            $product = wc_get_product($product_post->ID);
+
+            // Get all product images
+            $images = array();
+
+            // Main image
+            if ($product->get_image_id()) {
+                $image_url = wp_get_attachment_url($product->get_image_id());
+                if ($image_url) {
+                    $images[] = $image_url;
+                }
+            }
+
+            // Gallery images
+            $gallery_ids = $product->get_gallery_image_ids();
+            foreach ($gallery_ids as $image_id) {
+                $image_url = wp_get_attachment_url($image_id);
+                if ($image_url) {
+                    $images[] = $image_url;
+                }
+            }
+
+            if (!empty($images)) {
+                $product_data[] = array(
+                    'id' => $product->get_id(),
+                    'name' => $product->get_name(),
+                    'images' => $images,
+                );
             }
         }
 
-        if (!$is_target_page) {
-            error_log('WSC Background Remover: No match, exiting');
-            return;
+        wp_send_json_success(array('products' => $product_data));
+    }
+
+    /**
+     * AJAX: Save processed image
+     */
+    public function ajax_save_processed_image() {
+        check_ajax_referer('wsc_crm_nonce', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(array('message' => 'Unauthorized'));
         }
 
-        error_log('WSC Background Remover: Script will be loaded!');
+        $product_id = intval($_POST['product_id']);
+        $image_url = sanitize_text_field($_POST['image_url']);
+        $image_data = $_POST['image_data']; // Base64 data
 
-        // Get image selector
-        $image_selector = get_option('wsc_abr_image_selector', '.woocommerce-product-gallery img, .product img, .products img, img.attachment-woocommerce_thumbnail');
+        // Decode base64
+        $image_parts = explode(';base64,', $image_data);
+        if (count($image_parts) !== 2) {
+            wp_send_json_error(array('message' => 'Invalid image data'));
+        }
 
-        // Add inline script
-        add_action('wp_footer', function() use ($image_selector, $current_url) {
-            ?>
-            <script type="module">
-                console.log('🎨 WooCommerce CRM Background Remover: Loading...');
-                console.log('Current URL: <?php echo esc_js($current_url); ?>');
-                console.log('Image selector: <?php echo esc_js($image_selector); ?>');
+        $image_base64 = base64_decode($image_parts[1]);
+        if ($image_base64 === false) {
+            wp_send_json_error(array('message' => 'Failed to decode image'));
+        }
 
-                // Show visible notification
-                alert('🎨 Background Remover Active!\n\nThis page will process product images.\nCheck console (F12) for progress.');
+        // Get original filename
+        $original_filename = basename($image_url);
+        $path_info = pathinfo($original_filename);
 
-                // Import the background removal library using esm.sh CDN
-                import removeBackground from 'https://esm.sh/@imgly/background-removal@1.4.5?bundle';
+        // Create new filename with -no-bg suffix
+        $new_filename = $path_info['filename'] . '-no-bg.png';
 
-                async function processImages() {
-                    const images = document.querySelectorAll('<?php echo esc_js($image_selector); ?>');
-                    console.log(`🎨 Found ${images.length} product images to process`);
+        // Upload to WordPress
+        $upload = wp_upload_bits($new_filename, null, $image_base64);
 
-                    if (images.length === 0) {
-                        alert('⚠️ No product images found!\n\nSelector: <?php echo esc_js($image_selector); ?>');
-                        return;
-                    }
+        if ($upload['error']) {
+            wp_send_json_error(array('message' => $upload['error']));
+        }
 
-                    let processed = 0;
-                    let failed = 0;
+        // Create attachment
+        $attachment = array(
+            'post_mime_type' => 'image/png',
+            'post_title' => sanitize_file_name($new_filename),
+            'post_content' => '',
+            'post_status' => 'inherit'
+        );
 
-                    for (const img of images) {
-                        // Skip if already processed or data URL
-                        if (!img.src || img.src.startsWith('data:') || img.dataset.bgRemoved === 'true') {
-                            continue;
-                        }
+        $attach_id = wp_insert_attachment($attachment, $upload['file']);
 
-                        // Skip very small images (likely icons/logos)
-                        if (img.width < 50 || img.height < 50) {
-                            continue;
-                        }
+        if (is_wp_error($attach_id)) {
+            wp_send_json_error(array('message' => $attach_id->get_error_message()));
+        }
 
-                        try {
-                            console.log('Processing:', img.src);
+        // Generate metadata
+        require_once(ABSPATH . 'wp-admin/includes/image.php');
+        $attach_data = wp_generate_attachment_metadata($attach_id, $upload['file']);
+        wp_update_attachment_metadata($attach_id, $attach_data);
 
-                            // Add loading state
-                            img.style.opacity = '0.6';
-                            img.style.transition = 'opacity 0.3s';
+        // Find which image this is (main or gallery) and replace it
+        $product = wc_get_product($product_id);
 
-                            // Remove background
-                            const blob = await removeBackground(img.src);
-                            const url = URL.createObjectURL(blob);
+        // Check if it's the main image
+        $main_image_url = wp_get_attachment_url($product->get_image_id());
+        if ($main_image_url === $image_url) {
+            $product->set_image_id($attach_id);
+            $product->save();
+        } else {
+            // Check gallery images
+            $gallery_ids = $product->get_gallery_image_ids();
+            $new_gallery_ids = array();
 
-                            // Update image
-                            img.src = url;
-                            img.style.opacity = '1';
-                            img.dataset.bgRemoved = 'true';
-
-                            processed++;
-                            console.log('✅ Success!');
-
-                        } catch (error) {
-                            console.error('❌ Failed:', error);
-                            img.style.opacity = '1';
-                            failed++;
-                        }
-
-                        // Small delay between images to prevent browser freeze
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                    }
-
-                    console.log(`🎨 Background Remover Complete: ${processed} processed, ${failed} failed`);
-                    alert(`✅ Background Removal Complete!\n\n${processed} images processed\n${failed} failed`);
-                }
-
-                // Start processing when page is fully loaded
-                if (document.readyState === 'loading') {
-                    document.addEventListener('DOMContentLoaded', processImages);
+            foreach ($gallery_ids as $gallery_id) {
+                $gallery_url = wp_get_attachment_url($gallery_id);
+                if ($gallery_url === $image_url) {
+                    $new_gallery_ids[] = $attach_id; // Replace with new image
                 } else {
-                    processImages();
+                    $new_gallery_ids[] = $gallery_id; // Keep original
                 }
-            </script>
+            }
 
-            <style>
-                /* Add smooth transitions */
-                img {
-                    transition: opacity 0.3s ease;
-                }
-            </style>
-            <?php
-        }, 999);
+            $product->set_gallery_image_ids($new_gallery_ids);
+            $product->save();
+        }
+
+        wp_send_json_success(array(
+            'attachment_id' => $attach_id,
+            'filename' => $new_filename,
+            'url' => $upload['url']
+        ));
     }
 }
