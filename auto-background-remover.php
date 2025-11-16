@@ -3,7 +3,7 @@
  * Plugin Name: Auto Background Remover
  * Plugin URI: https://kontopyrgos.com.cy
  * Description: Automatically removes backgrounds from images on specific pages (Black Friday pages)
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Giannis
  * Author URI: https://kontopyrgos.com.cy
  * License: GPL v2 or later
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 
 class Auto_Background_Remover {
 
-    private $version = '1.0.0';
+    private $version = '1.0.1';
 
     public function __construct() {
         // Add admin menu
@@ -90,9 +90,9 @@ class Auto_Background_Remover {
                                       rows="5"
                                       class="large-text"><?php echo esc_textarea(get_option('abr_target_urls', "/black-friday\n/en/black-friday")); ?></textarea>
                             <p class="description">
-                                Enter URL paths (one per line) where background removal should work.<br>
+                                Enter exact URL paths (one per line) where background removal should work.<br>
                                 Examples: /black-friday or /en/black-friday<br>
-                                Current pages configured will match any URL containing these paths.
+                                <strong>Note:</strong> Must match exactly (e.g., /black-friday will NOT match /black-friday/products)
                             </p>
                         </td>
                     </tr>
@@ -162,14 +162,14 @@ class Auto_Background_Remover {
             return;
         }
 
-        // Check if current page matches target URLs
+        // Check if current page matches target URLs (exact match)
         $target_urls = explode("\n", get_option('abr_target_urls', "/black-friday\n/en/black-friday"));
-        $current_url = $_SERVER['REQUEST_URI'];
+        $current_url = rtrim($_SERVER['REQUEST_URI'], '/'); // Remove trailing slash
         $is_target_page = false;
 
         foreach ($target_urls as $url) {
-            $url = trim($url);
-            if (!empty($url) && strpos($current_url, $url) !== false) {
+            $url = rtrim(trim($url), '/'); // Remove trailing slash and whitespace
+            if (!empty($url) && $current_url === $url) {
                 $is_target_page = true;
                 break;
             }
