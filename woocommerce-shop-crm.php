@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce Shop CRM
  * Plugin URI: https://github.com/ioanniskon12/weather_app
  * Description: A comprehensive CRM system for WooCommerce shop owners to manage products, orders, and offers all in one place.
- * Version: 1.2.0
+ * Version: 1.3.0
  * Author: Your Name
  * Author URI: https://github.com/ioanniskon12
  * Text Domain: woo-shop-crm
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('WOO_SHOP_CRM_VERSION', '1.2.0');
+define('WOO_SHOP_CRM_VERSION', '1.3.0');
 define('WOO_SHOP_CRM_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WOO_SHOP_CRM_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('WOO_SHOP_CRM_PLUGIN_BASENAME', plugin_basename(__FILE__));
