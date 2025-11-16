@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce Shop CRM
  * Plugin URI: https://github.com/ioanniskon12/weather_app
  * Description: A comprehensive CRM system for WooCommerce shop owners to manage products, orders, and offers all in one place.
- * Version: 1.0.0
+ * Version: 1.0.4
  * Author: Your Name
  * Author URI: https://github.com/ioanniskon12
  * Text Domain: woo-shop-crm
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('WOO_SHOP_CRM_VERSION', '1.0.0');
+define('WOO_SHOP_CRM_VERSION', '1.0.4');
 define('WOO_SHOP_CRM_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WOO_SHOP_CRM_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('WOO_SHOP_CRM_PLUGIN_BASENAME', plugin_basename(__FILE__));
@@ -229,6 +229,13 @@ class WooCommerce_Shop_CRM {
             return;
         }
 
+        // Enqueue WordPress media library
+        wp_enqueue_media();
+
+        // Enqueue WordPress editor (TinyMCE)
+        wp_enqueue_editor();
+
+        // Enqueue styles
         wp_enqueue_style(
             'woo-shop-crm-admin',
             WOO_SHOP_CRM_PLUGIN_URL . 'assets/css/admin.css',
@@ -236,14 +243,16 @@ class WooCommerce_Shop_CRM {
             WOO_SHOP_CRM_VERSION
         );
 
+        // Enqueue scripts with proper dependencies
         wp_enqueue_script(
             'woo-shop-crm-admin',
             WOO_SHOP_CRM_PLUGIN_URL . 'assets/js/admin.js',
-            array('jquery'),
+            array('jquery', 'jquery-ui-sortable', 'wp-util'),
             WOO_SHOP_CRM_VERSION,
             true
         );
 
+        // Localize script with AJAX data
         wp_localize_script('woo-shop-crm-admin', 'wscCRM', array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('wsc_crm_nonce'),
@@ -251,6 +260,8 @@ class WooCommerce_Shop_CRM {
                 'confirm_delete' => __('Are you sure you want to delete this item?', 'woo-shop-crm'),
                 'error' => __('An error occurred. Please try again.', 'woo-shop-crm'),
                 'success' => __('Action completed successfully.', 'woo-shop-crm'),
+                'add_product' => __('Add New Product', 'woo-shop-crm'),
+                'edit_product' => __('Edit Product', 'woo-shop-crm'),
             )
         ));
     }

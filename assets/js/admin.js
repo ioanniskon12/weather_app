@@ -96,11 +96,19 @@
             const productId = $(this).data('product-id');
             const self = this;
 
+            console.log('Edit product clicked, ID:', productId);
+            console.log('AJAX URL:', wscCRM.ajax_url);
+            console.log('Nonce:', wscCRM.nonce);
+
+            // Show initial debug alert
+            alert('DEBUG:\nProduct ID: ' + productId + '\nAJAX URL: ' + wscCRM.ajax_url + '\nNonce exists: ' + (wscCRM.nonce ? 'Yes' : 'No'));
+
             $('#wsc-modal-title').text('Edit Product');
 
             // Show loading state
             $('#wsc-product-modal').fadeIn(300);
             $('#wsc-product-form').css('opacity', '0.5');
+            $('#wsc-product-form').prepend('<div class="wsc-loading-message" style="text-align: center; padding: 20px; font-size: 16px; background: #fff3cd; border: 2px solid #ffc107; color: #000;">⏳ Loading product data... Please wait...</div>');
 
             // Fetch product data via AJAX
             $.ajax({
@@ -112,17 +120,32 @@
                     product_id: productId
                 },
                 success: function(response) {
+                    console.log('AJAX Response:', response);
+                    $('.wsc-loading-message').remove();
+
                     if (response.success && response.data.product) {
+                        alert('✓ SUCCESS!\nProduct loaded: ' + response.data.product.name);
                         self.populateProductForm(response.data.product);
+                        $('#wsc-product-form').css('opacity', '1');
                     } else {
-                        self.showNotice('error', response.data.message || 'Failed to load product');
-                        self.closeModal();
+                        const errorMsg = response.data && response.data.message ? response.data.message : 'Failed to load product';
+                        console.error('Error loading product:', errorMsg);
+                        alert('❌ ERROR:\n\n' + errorMsg + '\n\nModal will stay open.');
+                        $('#wsc-product-form').css('opacity', '1');
                     }
-                    $('#wsc-product-form').css('opacity', '1');
                 },
-                error: function() {
-                    self.showNotice('error', wscCRM.strings.error || 'An error occurred');
-                    self.closeModal();
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', status, error);
+                    console.error('Response:', xhr.responseText);
+                    $('.wsc-loading-message').remove();
+
+                    let errorDetails = 'Status: ' + status + '\nError: ' + error;
+                    if (xhr.responseText) {
+                        errorDetails += '\n\nServer Response:\n' + xhr.responseText.substring(0, 200);
+                    }
+
+                    alert('❌ NETWORK ERROR:\n\n' + errorDetails);
+                    $('#wsc-product-form').css('opacity', '1');
                 }
             });
         },
