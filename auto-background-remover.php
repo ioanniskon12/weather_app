@@ -3,7 +3,7 @@
  * Plugin Name: Auto Background Remover
  * Plugin URI: https://kontopyrgos.com.cy
  * Description: Automatically removes backgrounds from images on specific pages (Black Friday pages)
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: Giannis
  * Author URI: https://kontopyrgos.com.cy
  * License: GPL v2 or later
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 
 class Auto_Background_Remover {
 
-    private $version = '1.0.1';
+    private $version = '1.0.2';
 
     public function __construct() {
         // Add admin menu
@@ -105,11 +105,12 @@ class Auto_Background_Remover {
                             <input type="text"
                                    id="abr_image_selector"
                                    name="abr_image_selector"
-                                   value="<?php echo esc_attr(get_option('abr_image_selector', '.product-image img, .product img, img')); ?>"
+                                   value="<?php echo esc_attr(get_option('abr_image_selector', '.woocommerce-product-gallery img, .product img, .products img, img.attachment-woocommerce_thumbnail')); ?>"
                                    class="large-text" />
                             <p class="description">
-                                CSS selector for images to process. Default processes all images.<br>
-                                Examples: <code>.product img</code> or <code>.woocommerce-product-gallery img</code>
+                                CSS selector for images to process. Default targets only WooCommerce product images.<br>
+                                Current default: <code>.woocommerce-product-gallery img, .product img, .products img</code><br>
+                                This excludes logos, banners, icons, and other non-product images.
                             </p>
                         </td>
                     </tr>
@@ -180,7 +181,7 @@ class Auto_Background_Remover {
         }
 
         // Get image selector
-        $image_selector = get_option('abr_image_selector', '.product-image img, .product img, img');
+        $image_selector = get_option('abr_image_selector', '.woocommerce-product-gallery img, .product img, .products img, img.attachment-woocommerce_thumbnail');
 
         // Add inline script
         add_action('wp_footer', function() use ($image_selector) {
