@@ -2,7 +2,7 @@
 /**
  * Background Remover Class
  *
- * Pre-processes product images to remove backgrounds (admin-side batch processing)
+ * Simple upload-based background remover interface
  */
 
 // Exit if accessed directly
@@ -13,19 +13,8 @@ if (!defined('ABSPATH')) {
 class WSC_Background_Remover {
 
     public function __construct() {
-        // Register settings
-        add_action('admin_init', array($this, 'register_settings'));
-
-        // AJAX handlers for processing images
-        add_action('wp_ajax_wsc_get_products_for_bg_removal', array($this, 'ajax_get_products'));
+        // AJAX handler for saving processed image
         add_action('wp_ajax_wsc_save_processed_image', array($this, 'ajax_save_processed_image'));
-    }
-
-    /**
-     * Register plugin settings
-     */
-    public function register_settings() {
-        register_setting('wsc_bg_remover_settings', 'wsc_abr_product_category');
     }
 
     /**
@@ -35,194 +24,235 @@ class WSC_Background_Remover {
         ?>
         <div class="wrap">
             <h1>🎨 Background Remover</h1>
-            <p>Process product images to remove backgrounds permanently.</p>
+            <p>Upload images or select from media library to remove backgrounds</p>
 
-            <div class="card" style="max-width: 100%; margin-top: 20px;">
-                <h2>Batch Process Products</h2>
-                <p>Select which products to process and click "Start Processing" to remove backgrounds from all product images.</p>
+            <div class="wsc-bg-remover-container">
+                <!-- Upload Area -->
+                <div class="wsc-upload-section">
+                    <div class="wsc-upload-box" id="wsc-upload-box">
+                        <div class="wsc-upload-content">
+                            <span class="dashicons dashicons-cloud-upload" style="font-size: 60px; color: #0073aa;"></span>
+                            <h2>Upload Image</h2>
+                            <p>Drag & drop image here or click to browse</p>
+                            <p class="wsc-formats">Supports: JPG, PNG, WEBP</p>
+                            <input type="file" id="wsc-file-input" accept="image/*" style="display: none;">
+                            <button type="button" class="button button-primary button-large" id="wsc-browse-btn">
+                                📁 Browse Files
+                            </button>
+                            <button type="button" class="button button-secondary button-large" id="wsc-media-btn" style="margin-left: 10px;">
+                                🖼️ Choose from Media Library
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
-                <table class="form-table">
-                    <tr>
-                        <th scope="row">
-                            <label for="wsc_product_category">Product Category</label>
-                        </th>
-                        <td>
-                            <select id="wsc_product_category" style="min-width: 300px;">
-                                <option value="">All Products</option>
-                                <?php
-                                $categories = get_terms(array(
-                                    'taxonomy' => 'product_cat',
-                                    'hide_empty' => false,
-                                ));
-                                foreach ($categories as $category) {
-                                    echo '<option value="' . esc_attr($category->term_id) . '">' . esc_html($category->name) . '</option>';
-                                }
-                                ?>
-                            </select>
-                            <p class="description">Choose a category or process all products</p>
-                        </td>
-                    </tr>
-                </table>
+                <!-- Processing Area -->
+                <div class="wsc-processing-section" id="wsc-processing-section" style="display: none;">
+                    <h2>Processing...</h2>
+                    <div class="wsc-spinner">
+                        <div class="spinner is-active" style="float: none; margin: 20px auto;"></div>
+                    </div>
+                    <p id="wsc-processing-status">Removing background...</p>
+                </div>
 
-                <p>
-                    <button type="button" id="wsc-start-bg-removal" class="button button-primary button-large">
-                        🎨 Start Processing
-                    </button>
-                    <button type="button" id="wsc-stop-bg-removal" class="button button-secondary" style="display:none;">
-                        ⏸️ Stop
-                    </button>
-                </p>
-
-                <div id="wsc-bg-removal-progress" style="display:none; margin-top: 20px;">
-                    <h3>Processing...</h3>
-                    <progress id="wsc-progress-bar" max="100" value="0" style="width: 100%; height: 30px;"></progress>
-                    <p id="wsc-progress-text">Preparing...</p>
-
-                    <div id="wsc-processed-list" style="margin-top: 20px; max-height: 400px; overflow-y: auto; background: #f5f5f5; padding: 15px; border-radius: 5px;">
-                        <h4>Processing Log:</h4>
-                        <ul id="wsc-log-list" style="list-style: none; padding: 0; font-family: monospace; font-size: 12px;"></ul>
+                <!-- Result Area -->
+                <div class="wsc-result-section" id="wsc-result-section" style="display: none;">
+                    <h2>Result</h2>
+                    <div class="wsc-comparison">
+                        <div class="wsc-image-box">
+                            <h3>Original</h3>
+                            <img id="wsc-original-preview" src="" alt="Original">
+                        </div>
+                        <div class="wsc-image-box">
+                            <h3>Background Removed</h3>
+                            <div class="wsc-transparent-bg">
+                                <img id="wsc-processed-preview" src="" alt="Processed">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="wsc-actions">
+                        <button type="button" class="button button-primary button-large" id="wsc-save-to-media">
+                            💾 Save to Media Library
+                        </button>
+                        <button type="button" class="button button-secondary button-large" id="wsc-download-btn">
+                            ⬇️ Download
+                        </button>
+                        <button type="button" class="button button-large" id="wsc-new-image">
+                            🔄 Process Another Image
+                        </button>
+                    </div>
+                    <div id="wsc-save-success" style="display: none; margin-top: 20px; padding: 15px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; color: #155724;">
+                        <strong>✅ Saved successfully!</strong> Image added to Media Library.
                     </div>
                 </div>
             </div>
         </div>
 
         <script type="module">
-            let processing = false;
-            let shouldStop = false;
+            let currentProcessedBlob = null;
+            let currentFilename = null;
 
-            document.getElementById('wsc-start-bg-removal').addEventListener('click', async function() {
-                if (processing) return;
+            // File input handling
+            document.getElementById('wsc-browse-btn').addEventListener('click', () => {
+                document.getElementById('wsc-file-input').click();
+            });
 
-                processing = true;
-                shouldStop = false;
-                this.style.display = 'none';
-                document.getElementById('wsc-stop-bg-removal').style.display = 'inline-block';
-                document.getElementById('wsc-bg-removal-progress').style.display = 'block';
+            document.getElementById('wsc-file-input').addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    processImage(e.target.files[0]);
+                }
+            });
 
-                const categoryId = document.getElementById('wsc_product_category').value;
+            // Drag & drop
+            const uploadBox = document.getElementById('wsc-upload-box');
+            uploadBox.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadBox.style.borderColor = '#0073aa';
+                uploadBox.style.background = '#f0f8ff';
+            });
 
-                addLog('🔍 Fetching products...');
+            uploadBox.addEventListener('dragleave', () => {
+                uploadBox.style.borderColor = '#ddd';
+                uploadBox.style.background = '#fff';
+            });
 
-                // Get products to process
-                const formData = new FormData();
-                formData.append('action', 'wsc_get_products_for_bg_removal');
-                formData.append('nonce', '<?php echo wp_create_nonce('wsc_crm_nonce'); ?>');
-                formData.append('category_id', categoryId);
+            uploadBox.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadBox.style.borderColor = '#ddd';
+                uploadBox.style.background = '#fff';
 
-                const response = await fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
-                    method: 'POST',
-                    body: formData
+                if (e.dataTransfer.files.length > 0) {
+                    processImage(e.dataTransfer.files[0]);
+                }
+            });
+
+            // Media library button
+            document.getElementById('wsc-media-btn').addEventListener('click', () => {
+                const mediaFrame = wp.media({
+                    title: 'Select Image',
+                    button: { text: 'Use this image' },
+                    multiple: false,
+                    library: { type: 'image' }
                 });
 
-                const data = await response.json();
+                mediaFrame.on('select', () => {
+                    const attachment = mediaFrame.state().get('selection').first().toJSON();
+                    fetch(attachment.url)
+                        .then(res => res.blob())
+                        .then(blob => {
+                            const file = new File([blob], attachment.filename, { type: blob.type });
+                            processImage(file);
+                        });
+                });
 
-                if (!data.success) {
-                    addLog('❌ Error: ' + data.data.message, 'error');
-                    resetButtons();
-                    return;
-                }
-
-                const products = data.data.products;
-                addLog(`✅ Found ${products.length} products to process`);
-
-                // Import background removal library
-                addLog('📦 Loading background removal library...');
-                const { default: removeBackground } = await import('https://esm.sh/@imgly/background-removal@1.4.5?bundle');
-                addLog('✅ Library loaded');
-
-                // Process each product
-                let processed = 0;
-                let failed = 0;
-
-                for (let i = 0; i < products.length; i++) {
-                    if (shouldStop) {
-                        addLog('⏸️ Processing stopped by user');
-                        break;
-                    }
-
-                    const product = products[i];
-                    const progress = Math.round(((i + 1) / products.length) * 100);
-                    document.getElementById('wsc-progress-bar').value = progress;
-                    document.getElementById('wsc-progress-text').textContent =
-                        `Processing ${i + 1} of ${products.length}: ${product.name}`;
-
-                    addLog(`🖼️ Processing: ${product.name}`);
-
-                    // Process each image in the product
-                    for (const imageUrl of product.images) {
-                        try {
-                            addLog(`  → Removing background from: ${imageUrl.split('/').pop()}`);
-
-                            const blob = await removeBackground(imageUrl);
-
-                            // Convert blob to base64
-                            const base64 = await blobToBase64(blob);
-
-                            // Send to server to save
-                            const saveData = new FormData();
-                            saveData.append('action', 'wsc_save_processed_image');
-                            saveData.append('nonce', '<?php echo wp_create_nonce('wsc_crm_nonce'); ?>');
-                            saveData.append('product_id', product.id);
-                            saveData.append('image_url', imageUrl);
-                            saveData.append('image_data', base64);
-
-                            const saveResponse = await fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
-                                method: 'POST',
-                                body: saveData
-                            });
-
-                            const saveResult = await saveResponse.json();
-
-                            if (saveResult.success) {
-                                addLog(`  ✅ Saved: ${saveResult.data.filename}`, 'success');
-                                processed++;
-                            } else {
-                                addLog(`  ❌ Failed to save: ${saveResult.data.message}`, 'error');
-                                failed++;
-                            }
-
-                        } catch (error) {
-                            addLog(`  ❌ Error: ${error.message}`, 'error');
-                            failed++;
-                        }
-
-                        // Small delay to prevent browser freeze
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                    }
-                }
-
-                addLog(`\n🎉 Processing complete!`);
-                addLog(`✅ Successfully processed: ${processed} images`);
-                if (failed > 0) {
-                    addLog(`❌ Failed: ${failed} images`, 'error');
-                }
-
-                resetButtons();
+                mediaFrame.open();
             });
 
-            document.getElementById('wsc-stop-bg-removal').addEventListener('click', function() {
-                shouldStop = true;
-                addLog('⏸️ Stopping after current image...');
-            });
+            // Process image
+            async function processImage(file) {
+                currentFilename = file.name;
 
-            function addLog(message, type = 'info') {
-                const logList = document.getElementById('wsc-log-list');
-                const li = document.createElement('li');
-                li.textContent = new Date().toLocaleTimeString() + ' - ' + message;
+                // Show processing section
+                document.querySelector('.wsc-upload-section').style.display = 'none';
+                document.getElementById('wsc-processing-section').style.display = 'block';
+                document.getElementById('wsc-result-section').style.display = 'none';
 
-                if (type === 'success') li.style.color = 'green';
-                if (type === 'error') li.style.color = 'red';
+                // Show original preview
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.getElementById('wsc-original-preview').src = e.target.result;
+                };
+                reader.readAsDataURL(file);
 
-                logList.appendChild(li);
-                logList.scrollTop = logList.scrollHeight;
+                try {
+                    // Load library
+                    document.getElementById('wsc-processing-status').textContent = 'Loading AI model...';
+                    const { default: removeBackground } = await import('https://esm.sh/@imgly/background-removal@1.4.5?bundle');
+
+                    // Process
+                    document.getElementById('wsc-processing-status').textContent = 'Removing background...';
+                    const blob = await removeBackground(file);
+
+                    currentProcessedBlob = blob;
+
+                    // Show result
+                    const processedUrl = URL.createObjectURL(blob);
+                    document.getElementById('wsc-processed-preview').src = processedUrl;
+
+                    document.getElementById('wsc-processing-section').style.display = 'none';
+                    document.getElementById('wsc-result-section').style.display = 'block';
+
+                } catch (error) {
+                    alert('Error processing image: ' + error.message);
+                    resetToUpload();
+                }
             }
 
-            function resetButtons() {
-                processing = false;
-                document.getElementById('wsc-start-bg-removal').style.display = 'inline-block';
-                document.getElementById('wsc-stop-bg-removal').style.display = 'none';
-                document.getElementById('wsc-progress-bar').value = 100;
-                document.getElementById('wsc-progress-text').textContent = 'Complete!';
+            // Download button
+            document.getElementById('wsc-download-btn').addEventListener('click', () => {
+                if (!currentProcessedBlob) return;
+
+                const url = URL.createObjectURL(currentProcessedBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = currentFilename.replace(/\.[^/.]+$/, '') + '-no-bg.png';
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+
+            // Save to media library
+            document.getElementById('wsc-save-to-media').addEventListener('click', async () => {
+                if (!currentProcessedBlob) return;
+
+                document.getElementById('wsc-save-to-media').disabled = true;
+                document.getElementById('wsc-save-to-media').textContent = 'Saving...';
+
+                try {
+                    // Convert blob to base64
+                    const base64 = await blobToBase64(currentProcessedBlob);
+
+                    // Save to WordPress
+                    const formData = new FormData();
+                    formData.append('action', 'wsc_save_processed_image');
+                    formData.append('nonce', '<?php echo wp_create_nonce('wsc_crm_nonce'); ?>');
+                    formData.append('image_data', base64);
+                    formData.append('filename', currentFilename.replace(/\.[^/.]+$/, '') + '-no-bg.png');
+
+                    const response = await fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        document.getElementById('wsc-save-success').style.display = 'block';
+                        document.getElementById('wsc-save-to-media').textContent = '✅ Saved!';
+                    } else {
+                        alert('Error: ' + result.data.message);
+                        document.getElementById('wsc-save-to-media').disabled = false;
+                        document.getElementById('wsc-save-to-media').textContent = '💾 Save to Media Library';
+                    }
+                } catch (error) {
+                    alert('Error saving: ' + error.message);
+                    document.getElementById('wsc-save-to-media').disabled = false;
+                    document.getElementById('wsc-save-to-media').textContent = '💾 Save to Media Library';
+                }
+            });
+
+            // Process another image
+            document.getElementById('wsc-new-image').addEventListener('click', resetToUpload);
+
+            function resetToUpload() {
+                document.querySelector('.wsc-upload-section').style.display = 'block';
+                document.getElementById('wsc-processing-section').style.display = 'none';
+                document.getElementById('wsc-result-section').style.display = 'none';
+                document.getElementById('wsc-save-success').style.display = 'none';
+                document.getElementById('wsc-save-to-media').disabled = false;
+                document.getElementById('wsc-save-to-media').textContent = '💾 Save to Media Library';
+                document.getElementById('wsc-file-input').value = '';
+                currentProcessedBlob = null;
+                currentFilename = null;
             }
 
             async function blobToBase64(blob) {
@@ -236,105 +266,108 @@ class WSC_Background_Remover {
         </script>
 
         <style>
-            #wsc-log-list li {
-                padding: 5px 0;
-                border-bottom: 1px solid #ddd;
+            .wsc-bg-remover-container {
+                max-width: 1200px;
+                margin: 20px 0;
             }
-            #wsc-progress-bar {
-                -webkit-appearance: none;
-                appearance: none;
+
+            .wsc-upload-box {
+                border: 3px dashed #ddd;
+                border-radius: 10px;
+                padding: 60px 40px;
+                text-align: center;
+                background: #fff;
+                transition: all 0.3s;
             }
-            #wsc-progress-bar::-webkit-progress-bar {
-                background-color: #f3f3f3;
-                border-radius: 3px;
+
+            .wsc-upload-box:hover {
+                border-color: #0073aa;
+                background: #f9f9f9;
             }
-            #wsc-progress-bar::-webkit-progress-value {
-                background-color: #2271b1;
-                border-radius: 3px;
+
+            .wsc-upload-content h2 {
+                margin: 15px 0 10px;
+                color: #333;
+            }
+
+            .wsc-formats {
+                color: #666;
+                font-size: 13px;
+                margin-bottom: 20px !important;
+            }
+
+            .wsc-comparison {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 30px;
+                margin: 20px 0;
+            }
+
+            .wsc-image-box {
+                text-align: center;
+            }
+
+            .wsc-image-box h3 {
+                margin: 0 0 15px;
+                font-size: 16px;
+            }
+
+            .wsc-image-box img {
+                max-width: 100%;
+                height: auto;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+
+            .wsc-transparent-bg {
+                background:
+                    linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+                    linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
+                    linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
+                    linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+                background-size: 20px 20px;
+                background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+                padding: 10px;
+                border-radius: 5px;
+                display: inline-block;
+            }
+
+            .wsc-actions {
+                text-align: center;
+                margin: 30px 0;
+            }
+
+            .wsc-actions button {
+                margin: 0 5px;
+            }
+
+            .wsc-processing-section {
+                text-align: center;
+                padding: 60px 20px;
+            }
+
+            @media (max-width: 768px) {
+                .wsc-comparison {
+                    grid-template-columns: 1fr;
+                }
             }
         </style>
         <?php
     }
 
     /**
-     * AJAX: Get products for background removal
-     */
-    public function ajax_get_products() {
-        check_ajax_referer('wsc_crm_nonce', 'nonce');
-
-        if (!current_user_can('manage_woocommerce')) {
-            wp_send_json_error(array('message' => 'Unauthorized'));
-        }
-
-        $category_id = isset($_POST['category_id']) ? intval($_POST['category_id']) : 0;
-
-        $args = array(
-            'post_type' => 'product',
-            'posts_per_page' => -1,
-            'post_status' => 'publish',
-        );
-
-        if ($category_id > 0) {
-            $args['tax_query'] = array(
-                array(
-                    'taxonomy' => 'product_cat',
-                    'field' => 'term_id',
-                    'terms' => $category_id,
-                ),
-            );
-        }
-
-        $products = get_posts($args);
-        $product_data = array();
-
-        foreach ($products as $product_post) {
-            $product = wc_get_product($product_post->ID);
-
-            // Get all product images
-            $images = array();
-
-            // Main image
-            if ($product->get_image_id()) {
-                $image_url = wp_get_attachment_url($product->get_image_id());
-                if ($image_url) {
-                    $images[] = $image_url;
-                }
-            }
-
-            // Gallery images
-            $gallery_ids = $product->get_gallery_image_ids();
-            foreach ($gallery_ids as $image_id) {
-                $image_url = wp_get_attachment_url($image_id);
-                if ($image_url) {
-                    $images[] = $image_url;
-                }
-            }
-
-            if (!empty($images)) {
-                $product_data[] = array(
-                    'id' => $product->get_id(),
-                    'name' => $product->get_name(),
-                    'images' => $images,
-                );
-            }
-        }
-
-        wp_send_json_success(array('products' => $product_data));
-    }
-
-    /**
-     * AJAX: Save processed image
+     * AJAX: Save processed image to media library
      */
     public function ajax_save_processed_image() {
         check_ajax_referer('wsc_crm_nonce', 'nonce');
 
-        if (!current_user_can('manage_woocommerce')) {
+        if (!current_user_can('upload_files')) {
             wp_send_json_error(array('message' => 'Unauthorized'));
         }
 
-        $product_id = intval($_POST['product_id']);
-        $image_url = sanitize_text_field($_POST['image_url']);
-        $image_data = $_POST['image_data']; // Base64 data
+        $image_data = $_POST['image_data'];
+        $filename = sanitize_file_name($_POST['filename']);
 
         // Decode base64
         $image_parts = explode(';base64,', $image_data);
@@ -347,15 +380,8 @@ class WSC_Background_Remover {
             wp_send_json_error(array('message' => 'Failed to decode image'));
         }
 
-        // Get original filename
-        $original_filename = basename($image_url);
-        $path_info = pathinfo($original_filename);
-
-        // Create new filename with -no-bg suffix
-        $new_filename = $path_info['filename'] . '-no-bg.png';
-
         // Upload to WordPress
-        $upload = wp_upload_bits($new_filename, null, $image_base64);
+        $upload = wp_upload_bits($filename, null, $image_base64);
 
         if ($upload['error']) {
             wp_send_json_error(array('message' => $upload['error']));
@@ -364,7 +390,7 @@ class WSC_Background_Remover {
         // Create attachment
         $attachment = array(
             'post_mime_type' => 'image/png',
-            'post_title' => sanitize_file_name($new_filename),
+            'post_title' => sanitize_file_name($filename),
             'post_content' => '',
             'post_status' => 'inherit'
         );
@@ -380,51 +406,10 @@ class WSC_Background_Remover {
         $attach_data = wp_generate_attachment_metadata($attach_id, $upload['file']);
         wp_update_attachment_metadata($attach_id, $attach_data);
 
-        // Store metadata to link processed image with original
-        // This allows us to restore originals later if needed
-        $product = wc_get_product($product_id);
-
-        // Find the original attachment ID
-        $original_attachment_id = null;
-
-        // Check if it's the main image
-        $main_image_url = wp_get_attachment_url($product->get_image_id());
-        if ($main_image_url === $image_url) {
-            $original_attachment_id = $product->get_image_id();
-        } else {
-            // Check gallery images
-            $gallery_ids = $product->get_gallery_image_ids();
-            foreach ($gallery_ids as $gallery_id) {
-                $gallery_url = wp_get_attachment_url($gallery_id);
-                if ($gallery_url === $image_url) {
-                    $original_attachment_id = $gallery_id;
-                    break;
-                }
-            }
-        }
-
-        // Store link between original and processed image
-        if ($original_attachment_id) {
-            update_post_meta($attach_id, '_wsc_original_image_id', $original_attachment_id);
-            update_post_meta($original_attachment_id, '_wsc_processed_image_id', $attach_id);
-        }
-
-        // Add processed image to gallery (don't replace original)
-        $gallery_ids = $product->get_gallery_image_ids();
-
-        // Add the new processed image to gallery if not already there
-        if (!in_array($attach_id, $gallery_ids)) {
-            $gallery_ids[] = $attach_id;
-            $product->set_gallery_image_ids($gallery_ids);
-            $product->save();
-        }
-
         wp_send_json_success(array(
             'attachment_id' => $attach_id,
-            'original_attachment_id' => $original_attachment_id,
-            'filename' => $new_filename,
-            'url' => $upload['url'],
-            'message' => 'Transparent background version added to gallery (original kept)'
+            'filename' => $filename,
+            'url' => $upload['url']
         ));
     }
 }
