@@ -380,36 +380,51 @@ class WSC_Background_Remover {
         $attach_data = wp_generate_attachment_metadata($attach_id, $upload['file']);
         wp_update_attachment_metadata($attach_id, $attach_data);
 
-        // Find which image this is (main or gallery) and replace it
+        // Store metadata to link processed image with original
+        // This allows us to restore originals later if needed
         $product = wc_get_product($product_id);
+
+        // Find the original attachment ID
+        $original_attachment_id = null;
 
         // Check if it's the main image
         $main_image_url = wp_get_attachment_url($product->get_image_id());
         if ($main_image_url === $image_url) {
-            $product->set_image_id($attach_id);
-            $product->save();
+            $original_attachment_id = $product->get_image_id();
         } else {
             // Check gallery images
             $gallery_ids = $product->get_gallery_image_ids();
-            $new_gallery_ids = array();
-
             foreach ($gallery_ids as $gallery_id) {
                 $gallery_url = wp_get_attachment_url($gallery_id);
                 if ($gallery_url === $image_url) {
-                    $new_gallery_ids[] = $attach_id; // Replace with new image
-                } else {
-                    $new_gallery_ids[] = $gallery_id; // Keep original
+                    $original_attachment_id = $gallery_id;
+                    break;
                 }
             }
+        }
 
-            $product->set_gallery_image_ids($new_gallery_ids);
+        // Store link between original and processed image
+        if ($original_attachment_id) {
+            update_post_meta($attach_id, '_wsc_original_image_id', $original_attachment_id);
+            update_post_meta($original_attachment_id, '_wsc_processed_image_id', $attach_id);
+        }
+
+        // Add processed image to gallery (don't replace original)
+        $gallery_ids = $product->get_gallery_image_ids();
+
+        // Add the new processed image to gallery if not already there
+        if (!in_array($attach_id, $gallery_ids)) {
+            $gallery_ids[] = $attach_id;
+            $product->set_gallery_image_ids($gallery_ids);
             $product->save();
         }
 
         wp_send_json_success(array(
             'attachment_id' => $attach_id,
+            'original_attachment_id' => $original_attachment_id,
             'filename' => $new_filename,
-            'url' => $upload['url']
+            'url' => $upload['url'],
+            'message' => 'Transparent background version added to gallery (original kept)'
         ));
     }
 }
