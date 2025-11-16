@@ -169,7 +169,7 @@ class WSC_Background_Remover {
                     document.getElementById('wsc-processing-status').textContent = 'Loading AI model...';
                     const { default: removeBackground } = await import('https://esm.sh/@imgly/background-removal@1.4.5?bundle');
 
-                    // Process
+                    // Process - creates PNG with transparent background, preserves quality
                     document.getElementById('wsc-processing-status').textContent = 'Removing background...';
                     const blob = await removeBackground(file);
 
@@ -183,6 +183,7 @@ class WSC_Background_Remover {
                     document.getElementById('wsc-result-section').style.display = 'block';
 
                 } catch (error) {
+                    console.error('Background removal error:', error);
                     alert('Error processing image: ' + error.message);
                     resetToUpload();
                 }
