@@ -138,36 +138,54 @@ class WSC_Background_Remover {
      * Enqueue frontend scripts
      */
     public function enqueue_frontend_scripts() {
+        // Debug: Log to PHP error log
+        error_log('WSC Background Remover: enqueue_frontend_scripts called');
+
         // Check if enabled
-        if (!get_option('wsc_abr_enabled', 0)) {
+        $is_enabled = get_option('wsc_abr_enabled', 0);
+        error_log('WSC Background Remover: Enabled = ' . ($is_enabled ? 'YES' : 'NO'));
+
+        if (!$is_enabled) {
             return;
         }
 
         // Check if current page matches target URLs (exact match)
         $target_urls = explode("\n", get_option('wsc_abr_target_urls', "/black-friday\n/en/black-friday"));
         $current_url = rtrim($_SERVER['REQUEST_URI'], '/'); // Remove trailing slash
+        error_log('WSC Background Remover: Current URL = ' . $current_url);
+
         $is_target_page = false;
 
         foreach ($target_urls as $url) {
             $url = rtrim(trim($url), '/'); // Remove trailing slash and whitespace
+            error_log('WSC Background Remover: Checking URL = ' . $url);
             if (!empty($url) && $current_url === $url) {
                 $is_target_page = true;
+                error_log('WSC Background Remover: MATCH! Will load script');
                 break;
             }
         }
 
         if (!$is_target_page) {
+            error_log('WSC Background Remover: No match, exiting');
             return;
         }
+
+        error_log('WSC Background Remover: Script will be loaded!');
 
         // Get image selector
         $image_selector = get_option('wsc_abr_image_selector', '.woocommerce-product-gallery img, .product img, .products img, img.attachment-woocommerce_thumbnail');
 
         // Add inline script
-        add_action('wp_footer', function() use ($image_selector) {
+        add_action('wp_footer', function() use ($image_selector, $current_url) {
             ?>
             <script type="module">
                 console.log('🎨 WooCommerce CRM Background Remover: Loading...');
+                console.log('Current URL: <?php echo esc_js($current_url); ?>');
+                console.log('Image selector: <?php echo esc_js($image_selector); ?>');
+
+                // Show visible notification
+                alert('🎨 Background Remover Active!\n\nThis page will process product images.\nCheck console (F12) for progress.');
 
                 // Import the background removal library
                 import removeBackground from 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/browser.min.js';
@@ -175,6 +193,11 @@ class WSC_Background_Remover {
                 async function processImages() {
                     const images = document.querySelectorAll('<?php echo esc_js($image_selector); ?>');
                     console.log(`🎨 Found ${images.length} product images to process`);
+
+                    if (images.length === 0) {
+                        alert('⚠️ No product images found!\n\nSelector: <?php echo esc_js($image_selector); ?>');
+                        return;
+                    }
 
                     let processed = 0;
                     let failed = 0;
@@ -220,6 +243,7 @@ class WSC_Background_Remover {
                     }
 
                     console.log(`🎨 Background Remover Complete: ${processed} processed, ${failed} failed`);
+                    alert(`✅ Background Removal Complete!\n\n${processed} images processed\n${failed} failed`);
                 }
 
                 // Start processing when page is fully loaded
