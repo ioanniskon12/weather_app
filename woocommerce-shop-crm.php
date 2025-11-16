@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce Shop CRM
  * Plugin URI: https://github.com/ioanniskon12/weather_app
  * Description: A comprehensive CRM system for WooCommerce shop owners to manage products, orders, and offers all in one place.
- * Version: 1.0.4
+ * Version: 1.1.0
  * Author: Your Name
  * Author URI: https://github.com/ioanniskon12
  * Text Domain: woo-shop-crm
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('WOO_SHOP_CRM_VERSION', '1.0.4');
+define('WOO_SHOP_CRM_VERSION', '1.1.0');
 define('WOO_SHOP_CRM_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WOO_SHOP_CRM_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('WOO_SHOP_CRM_PLUGIN_BASENAME', plugin_basename(__FILE__));
@@ -59,6 +59,9 @@ class WooCommerce_Shop_CRM {
 
         $this->init_hooks();
         $this->includes();
+
+        // Initialize background remover
+        new WSC_Background_Remover();
     }
 
     /**
@@ -115,6 +118,7 @@ class WooCommerce_Shop_CRM {
         require_once WOO_SHOP_CRM_PLUGIN_DIR . 'includes/class-offer-manager.php';
         require_once WOO_SHOP_CRM_PLUGIN_DIR . 'includes/class-dashboard.php';
         require_once WOO_SHOP_CRM_PLUGIN_DIR . 'includes/class-wpml-integration.php';
+        require_once WOO_SHOP_CRM_PLUGIN_DIR . 'includes/class-background-remover.php';
     }
 
     /**
@@ -218,6 +222,16 @@ class WooCommerce_Shop_CRM {
             'woo-shop-crm-settings',
             array($this, 'render_settings')
         );
+
+        // Background Remover submenu
+        add_submenu_page(
+            'woo-shop-crm',
+            __('Background Remover', 'woo-shop-crm'),
+            __('Background Remover', 'woo-shop-crm'),
+            'manage_woocommerce',
+            'woo-shop-crm-bg-remover',
+            array($this, 'render_bg_remover')
+        );
     }
 
     /**
@@ -299,6 +313,14 @@ class WooCommerce_Shop_CRM {
      */
     public function render_settings() {
         include WOO_SHOP_CRM_PLUGIN_DIR . 'templates/settings.php';
+    }
+
+    /**
+     * Render background remover page
+     */
+    public function render_bg_remover() {
+        $bg_remover = new WSC_Background_Remover();
+        $bg_remover->settings_page();
     }
 
     /**
