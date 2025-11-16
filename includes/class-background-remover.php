@@ -166,17 +166,35 @@ class WSC_Background_Remover {
 
                 try {
                     // Load library
-                    document.getElementById('wsc-processing-status').textContent = 'Loading AI model...';
+                    document.getElementById('wsc-processing-status').textContent = 'Loading AI model (this may take a minute)...';
+
+                    // Use remove.bg compatible library with better quality
                     const { default: removeBackground } = await import('https://esm.sh/@imgly/background-removal@1.4.5?bundle');
 
-                    // Process - creates PNG with transparent background, preserves quality
-                    document.getElementById('wsc-processing-status').textContent = 'Removing background...';
-                    const blob = await removeBackground(file);
+                    // Process with maximum quality settings
+                    document.getElementById('wsc-processing-status').textContent = 'Removing background (high quality mode)...';
 
-                    currentProcessedBlob = blob;
+                    const imageBlob = await removeBackground(file, {
+                        publicPath: 'https://esm.sh/@imgly/background-removal@1.4.5/dist/',
+                        debug: false,
+                        proxyToWorker: true,
+                        model: 'isnet_fp16', // Better quality model
+                        output: {
+                            format: 'image/png',
+                            quality: 1, // Maximum quality
+                            type: 'foreground',
+                        },
+                        progress: (key, current, total) => {
+                            const percentage = Math.round((current / total) * 100);
+                            document.getElementById('wsc-processing-status').textContent =
+                                `Processing: ${percentage}%`;
+                        }
+                    });
+
+                    currentProcessedBlob = imageBlob;
 
                     // Show result
-                    const processedUrl = URL.createObjectURL(blob);
+                    const processedUrl = URL.createObjectURL(imageBlob);
                     document.getElementById('wsc-processed-preview').src = processedUrl;
 
                     document.getElementById('wsc-processing-section').style.display = 'none';
@@ -184,7 +202,7 @@ class WSC_Background_Remover {
 
                 } catch (error) {
                     console.error('Background removal error:', error);
-                    alert('Error processing image: ' + error.message);
+                    alert('Error processing image: ' + error.message + '\n\nTry a smaller image or different format.');
                     resetToUpload();
                 }
             }
