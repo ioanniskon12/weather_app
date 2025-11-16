@@ -13,9 +13,8 @@ if (!defined('ABSPATH')) {
 class WSC_Background_Remover {
 
     public function __construct() {
-        // AJAX handlers
+        // AJAX handler for saving processed image
         add_action('wp_ajax_wsc_save_processed_image', array($this, 'ajax_save_processed_image'));
-        add_action('wp_ajax_wsc_process_bg_removal', array($this, 'ajax_process_background_removal'));
     }
 
     /**
@@ -149,7 +148,7 @@ class WSC_Background_Remover {
                 mediaFrame.open();
             });
 
-            // Process image using server-side AI
+            // Process image in browser (limited quality)
             async function processImage(file) {
                 currentFilename = file.name;
 
@@ -166,42 +165,26 @@ class WSC_Background_Remover {
                 reader.readAsDataURL(file);
 
                 try {
-                    document.getElementById('wsc-processing-status').textContent = 'Uploading to server...';
+                    // Load library
+                    document.getElementById('wsc-processing-status').textContent = 'Loading AI model...';
+                    const { default: removeBackground } = await import('https://esm.sh/@imgly/background-removal@1.4.5?bundle');
 
-                    // Send file to server for processing with Python AI
-                    const formData = new FormData();
-                    formData.append('action', 'wsc_process_bg_removal');
-                    formData.append('nonce', '<?php echo wp_create_nonce('wsc_crm_nonce'); ?>');
-                    formData.append('image', file);
+                    // Process with browser-based AI (limited quality)
+                    document.getElementById('wsc-processing-status').textContent = 'Removing background...';
+                    const blob = await removeBackground(file);
 
-                    document.getElementById('wsc-processing-status').textContent = 'Processing with AI model (this may take 10-30 seconds)...';
-
-                    const response = await fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    const result = await response.json();
-
-                    if (!result.success) {
-                        throw new Error(result.data.message || 'Processing failed');
-                    }
-
-                    // Convert base64 to blob
-                    const base64Response = await fetch(result.data.image_data);
-                    const imageBlob = await base64Response.blob();
-
-                    currentProcessedBlob = imageBlob;
+                    currentProcessedBlob = blob;
 
                     // Show result
-                    document.getElementById('wsc-processed-preview').src = result.data.image_data;
+                    const processedUrl = URL.createObjectURL(blob);
+                    document.getElementById('wsc-processed-preview').src = processedUrl;
 
                     document.getElementById('wsc-processing-section').style.display = 'none';
                     document.getElementById('wsc-result-section').style.display = 'block';
 
                 } catch (error) {
                     console.error('Background removal error:', error);
-                    alert('Error processing image: ' + error.message + '\n\nMake sure Python and rembg are installed on your server.');
+                    alert('Error: ' + error.message);
                     resetToUpload();
                 }
             }
@@ -428,78 +411,6 @@ class WSC_Background_Remover {
             'attachment_id' => $attach_id,
             'filename' => $filename,
             'url' => $upload['url']
-        ));
-    }
-
-    /**
-     * AJAX: Process background removal using server-side Python script
-     */
-    public function ajax_process_background_removal() {
-        check_ajax_referer('wsc_crm_nonce', 'nonce');
-
-        if (!current_user_can('upload_files')) {
-            wp_send_json_error(array('message' => 'Unauthorized'));
-        }
-
-        // Check if file was uploaded
-        if (!isset($_FILES['image']) || $_FILES['image']['error'] !== UPLOAD_ERR_OK) {
-            wp_send_json_error(array('message' => 'No image uploaded'));
-        }
-
-        $uploaded_file = $_FILES['image'];
-        $upload_dir = wp_upload_dir();
-
-        // Create temp directory if it doesn't exist
-        $temp_dir = $upload_dir['basedir'] . '/wsc-bg-temp';
-        if (!file_exists($temp_dir)) {
-            mkdir($temp_dir, 0755, true);
-        }
-
-        // Save uploaded file temporarily
-        $input_path = $temp_dir . '/' . uniqid('input_') . '_' . basename($uploaded_file['name']);
-        $output_path = $temp_dir . '/' . uniqid('output_') . '.png';
-
-        if (!move_uploaded_file($uploaded_file['tmp_name'], $input_path)) {
-            wp_send_json_error(array('message' => 'Failed to save uploaded file'));
-        }
-
-        // Path to Python script
-        $script_path = WOO_SHOP_CRM_PLUGIN_DIR . 'scripts/remove_bg.py';
-
-        // Check if Python script exists
-        if (!file_exists($script_path)) {
-            unlink($input_path);
-            wp_send_json_error(array('message' => 'Background removal script not found. Please run setup.'));
-        }
-
-        // Execute Python script
-        $command = sprintf(
-            'python3 %s %s %s 2>&1',
-            escapeshellarg($script_path),
-            escapeshellarg($input_path),
-            escapeshellarg($output_path)
-        );
-
-        exec($command, $output, $return_code);
-
-        // Clean up input file
-        unlink($input_path);
-
-        if ($return_code !== 0 || !file_exists($output_path)) {
-            $error_message = implode("\n", $output);
-            wp_send_json_error(array('message' => 'Background removal failed: ' . $error_message));
-        }
-
-        // Read processed image
-        $image_data = file_get_contents($output_path);
-        $base64_data = 'data:image/png;base64,' . base64_encode($image_data);
-
-        // Clean up output file
-        unlink($output_path);
-
-        wp_send_json_success(array(
-            'image_data' => $base64_data,
-            'message' => 'Background removed successfully'
         ));
     }
 }
