@@ -175,10 +175,7 @@ class WSC_Background_Remover {
                     document.getElementById('wsc-processing-status').textContent = 'Removing background (high quality mode)...';
 
                     const imageBlob = await removeBackground(file, {
-                        publicPath: 'https://esm.sh/@imgly/background-removal@1.4.5/dist/',
-                        debug: false,
-                        proxyToWorker: true,
-                        model: 'isnet_fp16', // Better quality model
+                        model: 'medium', // Higher quality model (options: 'small' or 'medium')
                         output: {
                             format: 'image/png',
                             quality: 1, // Maximum quality
