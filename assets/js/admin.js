@@ -93,89 +93,89 @@
 
         editProduct: function(e) {
             e.preventDefault();
-            const productId = $(this).data('product-id');
+            const productId = $(e.currentTarget).data('product-id');
             const self = this;
 
-            console.log('Edit product clicked, ID:', productId);
-            console.log('AJAX URL:', wscCRM.ajax_url);
-            console.log('Nonce:', wscCRM.nonce);
+            if (!productId) {
+                alert('Error: Product ID not found');
+                return;
+            }
 
-            // Show initial debug alert
-            alert('DEBUG:\nProduct ID: ' + productId + '\nAJAX URL: ' + wscCRM.ajax_url + '\nNonce exists: ' + (wscCRM.nonce ? 'Yes' : 'No'));
+            console.log('Editing product ID:', productId);
 
-            $('#wsc-modal-title').text('Edit Product');
+            // Update modal title
+            $('#wsc-modal-title').text(wscCRM.strings.edit_product || 'Edit Product');
 
-            // Show loading state
+            // Reset and show modal
+            this.resetProductForm();
             $('#wsc-product-modal').fadeIn(300);
-            $('#wsc-product-form').css('opacity', '0.5');
-            $('#wsc-product-form').prepend('<div class="wsc-loading-message" style="text-align: center; padding: 20px; font-size: 16px; background: #fff3cd; border: 2px solid #ffc107; color: #000;">⏳ Loading product data... Please wait...</div>');
 
-            // Fetch product data via AJAX
+            // Show loading indicator
+            const $loading = $('<div class="wsc-loading-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.9); display: flex; align-items: center; justify-content: center; z-index: 1000;"><div style="text-align: center;"><div class="spinner is-active" style="float: none; margin: 0 auto 10px;"></div><p>Loading product data...</p></div></div>');
+            $('.wsc-modal-body').css('position', 'relative').append($loading);
+
+            // Fetch product data
             $.ajax({
                 url: wscCRM.ajax_url,
                 type: 'POST',
+                dataType: 'json',
                 data: {
                     action: 'wsc_get_product',
                     nonce: wscCRM.nonce,
                     product_id: productId
                 },
                 success: function(response) {
-                    console.log('AJAX Response:', response);
-                    $('.wsc-loading-message').remove();
+                    console.log('Product data loaded:', response);
+                    $loading.remove();
 
-                    if (response.success && response.data.product) {
-                        alert('✓ SUCCESS!\nProduct loaded: ' + response.data.product.name);
+                    if (response.success && response.data && response.data.product) {
                         self.populateProductForm(response.data.product);
-                        $('#wsc-product-form').css('opacity', '1');
                     } else {
-                        const errorMsg = response.data && response.data.message ? response.data.message : 'Failed to load product';
-                        console.error('Error loading product:', errorMsg);
-                        alert('❌ ERROR:\n\n' + errorMsg + '\n\nModal will stay open.');
-                        $('#wsc-product-form').css('opacity', '1');
+                        self.showNotice('error', response.data && response.data.message ? response.data.message : 'Failed to load product data');
+                        self.closeModal();
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('AJAX Error:', status, error);
-                    console.error('Response:', xhr.responseText);
-                    $('.wsc-loading-message').remove();
-
-                    let errorDetails = 'Status: ' + status + '\nError: ' + error;
-                    if (xhr.responseText) {
-                        errorDetails += '\n\nServer Response:\n' + xhr.responseText.substring(0, 200);
-                    }
-
-                    alert('❌ NETWORK ERROR:\n\n' + errorDetails);
-                    $('#wsc-product-form').css('opacity', '1');
+                    console.error('AJAX error:', {xhr, status, error});
+                    $loading.remove();
+                    self.showNotice('error', 'Network error: Unable to load product. Please check your connection and try again.');
+                    self.closeModal();
                 }
             });
         },
 
         populateProductForm: function(product) {
-            // Basic fields
-            $('#product_id').val(product.id);
-            $('#product_name').val(product.name);
-            $('#product_short_description').val(product.short_description);
-            $('#product_price').val(product.regular_price);
-            $('#product_sale_price').val(product.sale_price);
-            $('#product_sale_from').val(product.sale_from);
-            $('#product_sale_to').val(product.sale_to);
-            $('#product_sku').val(product.sku);
-            $('#product_stock').val(product.stock_quantity);
-            $('#product_stock_status').val(product.stock_status);
+            console.log('Populating form with product:', product);
 
-            // Manage stock checkbox
-            $('#product_manage_stock').prop('checked', product.manage_stock);
-            if (product.manage_stock) {
-                $('#stock_quantity_field').show();
-            } else {
-                $('#stock_quantity_field').hide();
-            }
+            try {
+                // Basic fields
+                $('#product_id').val(product.id || '');
+                $('#product_name').val(product.name || '');
+                $('#product_short_description').val(product.short_description || '');
+                $('#product_price').val(product.regular_price || '');
+                $('#product_sale_price').val(product.sale_price || '');
+                $('#product_sale_from').val(product.sale_from || '');
+                $('#product_sale_to').val(product.sale_to || '');
+                $('#product_sku').val(product.sku || '');
+                $('#product_stock').val(product.stock_quantity || '');
+                $('#product_stock_status').val(product.stock_status || 'instock');
 
-            // Description with TinyMCE
-            if (typeof tinymce !== 'undefined' && tinymce.get('product_description')) {
-                tinymce.get('product_description').setContent(product.description || '');
-            } else {
-                $('#product_description').val(product.description);
+                // Manage stock checkbox
+                $('#product_manage_stock').prop('checked', !!product.manage_stock);
+                if (product.manage_stock) {
+                    $('#stock_quantity_field').show();
+                } else {
+                    $('#stock_quantity_field').hide();
+                }
+
+                // Description with TinyMCE
+                if (typeof tinymce !== 'undefined' && tinymce.get('product_description')) {
+                    tinymce.get('product_description').setContent(product.description || '');
+                } else {
+                    $('#product_description').val(product.description || '');
+                }
+            } catch (error) {
+                console.error('Error populating basic fields:', error);
             }
 
             // Categories
@@ -247,6 +247,8 @@
                 galleryHtml += '</div>';
                 $('#product_gallery_preview').html(galleryHtml);
             }
+
+            console.log('✅ Product form populated successfully');
         },
 
         deleteProduct: function(e) {
