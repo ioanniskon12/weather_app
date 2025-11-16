@@ -18,6 +18,49 @@ class WSC_Background_Remover {
 
         // Enqueue scripts on frontend
         add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_scripts'));
+
+        // Add debug banner to footer on ALL pages (temporary)
+        add_action('wp_footer', array($this, 'debug_banner'), 1);
+    }
+
+    /**
+     * Debug banner - shows if feature would activate on this page
+     */
+    public function debug_banner() {
+        $is_enabled = get_option('wsc_abr_enabled', 0);
+        $target_urls = get_option('wsc_abr_target_urls', "/black-friday\n/en/black-friday");
+        $current_url = $_SERVER['REQUEST_URI'];
+        $current_url_trimmed = rtrim($current_url, '/');
+
+        $target_urls_array = explode("\n", $target_urls);
+        $matches = [];
+        foreach ($target_urls_array as $url) {
+            $url = rtrim(trim($url), '/');
+            if (!empty($url)) {
+                $matches[] = $url;
+            }
+        }
+
+        ?>
+        <div style="position: fixed; bottom: 0; left: 0; right: 0; background: #000; color: #0f0; padding: 10px; font-family: monospace; font-size: 12px; z-index: 999999; border-top: 2px solid #0f0;">
+            <strong>🎨 Background Remover Debug:</strong><br>
+            Enabled: <?php echo $is_enabled ? '✅ YES' : '❌ NO'; ?><br>
+            Current URL: <code><?php echo esc_html($current_url); ?></code><br>
+            Current URL (trimmed): <code><?php echo esc_html($current_url_trimmed); ?></code><br>
+            Target URLs: <code><?php echo esc_html(implode(', ', $matches)); ?></code><br>
+            Match: <?php
+                $found = false;
+                foreach ($matches as $m) {
+                    if ($current_url_trimmed === $m) {
+                        echo '✅ YES - Script will load!';
+                        $found = true;
+                        break;
+                    }
+                }
+                if (!$found) echo '❌ NO';
+            ?>
+        </div>
+        <?php
     }
 
     /**
